@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "865966306402",
+    "project_id": "pal48checkpoint",
+    "storage_bucket": "pal48checkpoint.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:865966306402:android:3e482e66eb21e0331bcd3b",
+        "android_client_info": {
+          "package_name": "com.example.checkpoint_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD11OyNpBiUSva9qD-7ugdc71ZIr7UiIeE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:865966306402:android:e83cd472126fd2681bcd3b",
+        "android_client_info": {
+          "package_name": "com.example.pal48checkpoints"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD11OyNpBiUSva9qD-7ugdc71ZIr7UiIeE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
