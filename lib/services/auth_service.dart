@@ -1,12 +1,27 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
+  /// Created only on mobile/desktop — never on web, or [GoogleSignIn]
+  /// asserts for a web OAuth client ID at construction time.
+  GoogleSignIn? _mobileGoogleSignIn;
+
+  GoogleSignIn get _googleSignInNonWeb {
+    return _mobileGoogleSignIn ??= GoogleSignIn();
+  }
+
+  /// Web uses Firebase Auth popup OAuth (no `GoogleSignIn` web client ID).
+  /// Android/iOS use the `google_sign_in` plugin.
   Future<UserCredential> signInWithGoogle() async {
-    final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+    if (kIsWeb) {
+      final GoogleAuthProvider provider = GoogleAuthProvider();
+      return _auth.signInWithPopup(provider);
+    }
+
+    final GoogleSignInAccount? googleUser = await _googleSignInNonWeb.signIn();
     if (googleUser == null) {
       throw Exception('Google sign-in cancelled');
     }
@@ -22,7 +37,9 @@ class AuthService {
   }
 
   Future<void> signOut() async {
-    await _googleSignIn.signOut();
+    if (!kIsWeb) {
+      await _mobileGoogleSignIn?.signOut();
+    }
     await _auth.signOut();
   }
 }
