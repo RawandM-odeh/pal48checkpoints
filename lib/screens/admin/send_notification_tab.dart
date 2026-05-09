@@ -29,7 +29,7 @@ class _SendNotificationTabState extends State<SendNotificationTab> {
     }
     setState(() => _sending = true);
     try {
-      await context.read<NotificationRepository>().sendBroadcastToAllUsers(
+      await context.read<NotificationRepository>().saveNotificationDocument(
             title: _titleCtrl.text,
             body: _bodyCtrl.text,
           );
@@ -67,7 +67,7 @@ class _SendNotificationTabState extends State<SendNotificationTab> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               Text(
-                'إرسال إشعار لجميع المستخدمين',
+                'إرسال إشعار',
                 style: theme.textTheme.titleLarge,
                 textAlign: TextAlign.right,
               ),
@@ -76,7 +76,7 @@ class _SendNotificationTabState extends State<SendNotificationTab> {
                 controller: _titleCtrl,
                 textAlign: TextAlign.right,
                 decoration: const InputDecoration(
-                  labelText: 'العنوان',
+                  labelText: 'عنوان الإشعار',
                   border: OutlineInputBorder(),
                 ),
                 validator: (String? v) {
@@ -92,7 +92,7 @@ class _SendNotificationTabState extends State<SendNotificationTab> {
                 textAlign: TextAlign.right,
                 maxLines: 4,
                 decoration: const InputDecoration(
-                  labelText: 'النص',
+                  labelText: 'نص الإشعار',
                   border: OutlineInputBorder(),
                 ),
                 validator: (String? v) {
@@ -115,16 +115,7 @@ class _SendNotificationTabState extends State<SendNotificationTab> {
                         ),
                       )
                     : const Icon(Icons.send),
-                label:
-                    Text(_sending ? 'جاري الإرسال...' : 'إرسال للجميع'),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'يجب أن تكون دالة sendBroadcastNotification مفعّلة في Cloud Functions وأن حساب المشرف موجود في Firebase.',
-                textAlign: TextAlign.right,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+                label: Text(_sending ? 'جاري الإرسال...' : 'إرسال إشعار'),
               ),
             ],
           ),

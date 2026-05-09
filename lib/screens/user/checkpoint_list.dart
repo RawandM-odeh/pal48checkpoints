@@ -3,99 +3,332 @@ import 'package:provider/provider.dart';
 
 import '../../models/checkpoint.dart';
 import '../../providers/checkpoint_provider.dart';
+import '../../utils/ar_relative_time.dart';
+
+abstract final class _CardUi {
+  static const Color navy = Color(0xFF163E6C);
+  static const Color arrowBlue = Color(0xFF4A90D9);
+}
 
 class CheckpointList extends StatelessWidget {
   const CheckpointList({super.key});
 
-  Future<void> _showStatusPicker(
-    BuildContext context,
-    Checkpoint checkpoint,
-  ) async {
-    final CheckpointProvider checkpointProvider =
-        context.read<CheckpointProvider>();
-    String selected = CheckpointStatus.normalize(checkpoint.status);
+  Future<void> _showStatusBottomSheet({
+    required BuildContext context,
+    required Checkpoint checkpoint,
+    required String direction,
+  }) async {
+    final CheckpointProvider provider = context.read<CheckpointProvider>();
+    final String title = direction == 'entrance'
+        ? 'تغيير حالة الدخول'
+        : 'تغيير حالة الخروج';
 
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
+      backgroundColor: Colors.white,
       builder: (BuildContext bc) {
-        return StatefulBuilder(
-          builder:
-              (BuildContext context, void Function(void Function()) setInner) {
-            return Padding(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: SafeArea(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                8,
+                20,
+                16 + MediaQuery.paddingOf(bc).bottom,
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
                   Text(
-                    checkpoint.name.isEmpty ? 'النقطة' : checkpoint.name,
-                    style: Theme.of(bc).textTheme.titleLarge,
-                    textAlign: TextAlign.right,
+                    title,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(bc).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: _CardUi.navy,
+                        ),
                   ),
-                  const SizedBox(height: 12),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      'اختر الحالة',
-                      style: Theme.of(bc).textTheme.titleSmall,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ...CheckpointStatus.all.map((String status) {
-                    final String normalized =
-                        CheckpointStatus.normalize(status);
-                    return RadioListTile<String>(
-                      value: normalized,
-                      groupValue: selected,
-                      onChanged: (String? value) {
-                        if (value == null) {
-                          return;
-                        }
-                        setInner(() => selected = value);
-                      },
-                      title: Align(
-                        alignment: Alignment.centerRight,
-                        child: Text(CheckpointStatus.labelAr(normalized)),
-                      ),
-                      contentPadding: EdgeInsets.zero,
-                    );
-                  }),
-                  const SizedBox(height: 16),
-                  FilledButton.icon(
-                    onPressed: () async {
-                      try {
-                        await checkpointProvider.repository.updateStatus(
-                          checkpointId: checkpoint.id,
-                          status: selected,
-                        );
-                        if (bc.mounted) {
-                          Navigator.of(bc).pop();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('تم حفظ الحالة'),
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        if (bc.mounted) {
-                          ScaffoldMessenger.of(bc).showSnackBar(
-                            SnackBar(
-                              content: Text('خطأ في الحفظ: $e'),
-                            ),
-                          );
-                        }
-                      }
+                  const SizedBox(height: 18),
+                  _statusSheetButton(
+                    context: bc,
+                    label: '✓ سالك',
+                    bg: CheckpointStatus.badgeColors(CheckpointStatus.open).bg,
+                    fg: CheckpointStatus.badgeColors(CheckpointStatus.open).fg,
+                    onTap: () async {
+                      Navigator.of(bc).pop();
+                      await _applyStatus(
+                        context: context,
+                        provider: provider,
+                        checkpoint: checkpoint,
+                        direction: direction,
+                        status: CheckpointStatus.open,
+                      );
                     },
-                    icon: const Icon(Icons.save),
-                    label: const Text('حفظ'),
+                  ),
+                  const SizedBox(height: 10),
+                  _statusSheetButton(
+                    context: bc,
+                    label: '✗ مغلق',
+                    bg:
+                        CheckpointStatus.badgeColors(CheckpointStatus.closed).bg,
+                    fg:
+                        CheckpointStatus.badgeColors(CheckpointStatus.closed).fg,
+                    onTap: () async {
+                      Navigator.of(bc).pop();
+                      await _applyStatus(
+                        context: context,
+                        provider: provider,
+                        checkpoint: checkpoint,
+                        direction: direction,
+                        status: CheckpointStatus.closed,
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  _statusSheetButton(
+                    context: bc,
+                    label: '~ مزدحم',
+                    bg: CheckpointStatus.badgeColors(CheckpointStatus.crowded)
+                        .bg,
+                    fg: CheckpointStatus.badgeColors(CheckpointStatus.crowded)
+                        .fg,
+                    onTap: () async {
+                      Navigator.of(bc).pop();
+                      await _applyStatus(
+                        context: context,
+                        provider: provider,
+                        checkpoint: checkpoint,
+                        direction: direction,
+                        status: CheckpointStatus.crowded,
+                      );
+                    },
                   ),
                 ],
               ),
-            );
-          },
+            ),
+          ),
         );
       },
+    );
+  }
+
+  Widget _statusSheetButton({
+    required BuildContext context,
+    required String label,
+    required Color bg,
+    required Color fg,
+    required VoidCallback onTap,
+  }) {
+    return FilledButton(
+      style: FilledButton.styleFrom(
+        backgroundColor: bg,
+        foregroundColor: fg,
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+      ),
+      onPressed: onTap,
+      child: Text(
+        label,
+        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+      ),
+    );
+  }
+
+  Future<void> _applyStatus({
+    required BuildContext context,
+    required CheckpointProvider provider,
+    required Checkpoint checkpoint,
+    required String direction,
+    required String status,
+  }) async {
+    try {
+      await provider.updateStatus(checkpoint.id, direction, status);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('تم حفظ التحديث')),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('خطأ في الحفظ: $e')),
+        );
+      }
+    }
+  }
+
+  static Widget _statusBadge({
+    required BuildContext context,
+    required String status,
+    required VoidCallback onTap,
+  }) {
+    final ({Color bg, Color fg}) styl = CheckpointStatus.badgeColors(status);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          decoration: BoxDecoration(
+            color: styl.bg,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            CheckpointStatus.badgeLabelAr(status),
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: styl.fg,
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  static Widget _checkpointCard(
+    BuildContext context,
+    Checkpoint c,
+    void Function(String direction) onBadgeTap,
+  ) {
+    final ThemeData theme = Theme.of(context);
+    return Material(
+      color: Colors.white,
+      elevation: 3,
+      shadowColor: Colors.black.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 12, 10, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            SizedBox(
+              height: 28,
+              child: Stack(
+                alignment: Alignment.center,
+                children: <Widget>[
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    child: Icon(
+                      Icons.chevron_left_rounded,
+                      color: _CardUi.arrowBlue,
+                      size: 26,
+                    ),
+                  ),
+                  Text(
+                    c.name.isEmpty ? 'بدون اسم' : c.name,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: _CardUi.navy,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Divider(height: 18, thickness: 1, color: Colors.grey.shade200),
+            Expanded(
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  textDirection: TextDirection.rtl,
+                  children: <Widget>[
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: <Widget>[
+                          Text(
+                            'الدخول',
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: _CardUi.navy,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Expanded(
+                            child: Align(
+                              alignment: Alignment.topCenter,
+                              child: _statusBadge(
+                                context: context,
+                                status: c.entranceStatus,
+                                onTap: () => onBadgeTap('entrance'),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            arabicRelativeSince(c.entranceUpdatedAt),
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: _CardUi.navy.withValues(alpha: 0.55),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      child: VerticalDivider(
+                        width: 1,
+                        thickness: 1,
+                        color: Colors.grey.shade300,
+                      ),
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: <Widget>[
+                          Text(
+                            'الخروج',
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: _CardUi.navy,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Expanded(
+                            child: Align(
+                              alignment: Alignment.topCenter,
+                              child: _statusBadge(
+                                context: context,
+                                status: c.exitStatus,
+                                onTap: () => onBadgeTap('exit'),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            arabicRelativeSince(c.exitUpdatedAt),
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: _CardUi.navy.withValues(alpha: 0.55),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -128,65 +361,34 @@ class CheckpointList extends StatelessWidget {
         child: Text(
           'لا توجد نقاط بعد',
           style: theme.textTheme.titleMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+            color: _CardUi.navy.withValues(alpha: 0.6),
           ),
         ),
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-      itemBuilder: (BuildContext context, int index) {
-        final Checkpoint c = provider.items[index];
-        final Color color = CheckpointStatus.chipColor(context, c.status);
-        return Material(
-          color: theme.colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
-          clipBehavior: Clip.antiAlias,
-          child: ListTile(
-            onTap: () => _showStatusPicker(context, c),
-            trailing: CircleAvatar(
-              backgroundColor: color.withValues(alpha: 0.22),
-              child: Icon(
-                Icons.circle,
-                color: color,
-                size: 16,
-              ),
-            ),
-            title: Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                c.name.isEmpty ? 'بدون اسم' : c.name,
-                style: theme.textTheme.titleMedium,
-              ),
-            ),
-            subtitle: Align(
-              alignment: Alignment.centerRight,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: <Widget>[
-                  if (c.location.isNotEmpty) Text(c.location),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      Text(
-                        CheckpointStatus.labelAr(c.status),
-                        style: theme.textTheme.labelLarge?.copyWith(color: color),
-                      ),
-                      const SizedBox(width: 6),
-                      const Icon(Icons.edit, size: 16),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-      separatorBuilder: (BuildContext context, int _) =>
-          const SizedBox(height: 8),
-      itemCount: provider.items.length,
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: GridView.builder(
+        padding: const EdgeInsets.all(8),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+          mainAxisExtent: 220,
+        ),
+        itemCount: provider.items.length,
+        itemBuilder: (BuildContext context, int index) {
+          final Checkpoint c = provider.items[index];
+          return _checkpointCard(context, c, (String direction) {
+            _showStatusBottomSheet(
+              context: context,
+              checkpoint: c,
+              direction: direction,
+            );
+          });
+        },
+      ),
     );
   }
 }

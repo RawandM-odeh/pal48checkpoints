@@ -23,36 +23,39 @@ class _AdminScreenState extends State<AdminScreen> {
   Widget build(BuildContext context) {
     final AuthService authService = AuthService();
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('لوحة الإدارة'),
-        actions: <Widget>[
-          IconButton(
-            onPressed: authService.signOut,
-            icon: const Icon(Icons.logout),
-          ),
-        ],
-      ),
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _tabs,
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (int i) =>
-            setState(() => _currentIndex = i),
-        destinations: const <NavigationDestination>[
-          NavigationDestination(
-            icon: Icon(Icons.map_outlined),
-            selectedIcon: Icon(Icons.map),
-            label: 'النقاط',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.notifications_outlined),
-            selectedIcon: Icon(Icons.notifications),
-            label: 'إرسال',
-          ),
-        ],
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('لوحة الإدارة'),
+          actions: <Widget>[
+            IconButton(
+              onPressed: authService.signOut,
+              icon: const Icon(Icons.logout),
+            ),
+          ],
+        ),
+        body: IndexedStack(
+          index: _currentIndex,
+          children: _tabs,
+        ),
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: (int i) => setState(() => _currentIndex = i),
+          type: BottomNavigationBarType.fixed,
+          items: const <BottomNavigationBarItem>[
+            BottomNavigationBarItem(
+              icon: Icon(Icons.map_outlined),
+              activeIcon: Icon(Icons.map),
+              label: '🗺️ إدارة الحواجز',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.campaign_outlined),
+              activeIcon: Icon(Icons.campaign),
+              label: '📢 إرسال إشعار',
+            ),
+          ],
+        ),
       ),
     );
   }

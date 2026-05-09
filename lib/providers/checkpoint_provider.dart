@@ -35,6 +35,14 @@ class CheckpointProvider extends ChangeNotifier {
 
   CheckpointRepository get repository => _repository;
 
+  Future<void> updateStatus(
+    String id,
+    String direction,
+    String status,
+  ) {
+    return _repository.updateStatus(id, direction, status);
+  }
+
   @override
   void dispose() {
     _subscription?.cancel();

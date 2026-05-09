@@ -3,6 +3,56 @@ const admin = require("firebase-admin");
 
 admin.initializeApp();
 
+const STATUS_AR = Object.freeze({
+  open: "مفتوح",
+  closed: "مغلق",
+  crowded: "مزدحم",
+});
+
+/** Only open | closed | crowded; otherwise [fallback] (default open). */
+function normalizeStatus(raw, fallback = "open") {
+  if (typeof raw !== "string") {
+    return fallback;
+  }
+  const v = raw.trim().toLowerCase();
+  if (v === "open" || v === "closed" || v === "crowded") {
+    return v;
+  }
+  return fallback;
+}
+
+/** Read entrance/exit; camelCase first, then snake_case; legacy `status` fallback. */
+function readDirections(data) {
+  const legacyFallback = normalizeStatus(data.status);
+
+  const entranceRaw =
+    typeof data.entranceStatus === "string" &&
+        data.entranceStatus.trim() !== "" ?
+      data.entranceStatus :
+      typeof data.entrance_status === "string" &&
+          data.entrance_status.trim() !== "" ?
+        data.entrance_status :
+        null;
+
+  const exitRaw =
+    typeof data.exitStatus === "string" &&
+        data.exitStatus.trim() !== "" ?
+      data.exitStatus :
+      typeof data.exit_status === "string" &&
+          data.exit_status.trim() !== "" ?
+        data.exit_status :
+        null;
+
+  const entrance = entranceRaw !== null ?
+    normalizeStatus(entranceRaw, legacyFallback) :
+    legacyFallback;
+  const exit = exitRaw !== null ?
+    normalizeStatus(exitRaw, legacyFallback) :
+    legacyFallback;
+
+  return {entrance, exit};
+}
+
 async function notifyAll(title, body, data = {}) {
   const snapshot = await admin.firestore().collection("users").get();
   /** @type {string[]} */
@@ -80,16 +130,15 @@ exports.onCheckpointUpdated = functions.firestore
     .onUpdate(async (change, context) => {
       const before = change.before.exists ? change.before.data() : null;
       const after = change.after.data();
-      if (!after) {
+      if (!before || !after) {
         return null;
       }
-      const prevStatus =
-        before && typeof before.status === "string" ? before.status : null;
-      const nextStatus =
-        typeof after.status === "string" ? after.status : "unknown";
 
-      // Only ping users when status actually changes from the previous revision.
-      if (prevStatus === nextStatus) {
+      const prev = readDirections(before);
+      const next = readDirections(after);
+
+      if (prev.entrance === next.entrance &&
+          prev.exit === next.exit) {
         return null;
       }
 
@@ -97,8 +146,11 @@ exports.onCheckpointUpdated = functions.firestore
         typeof after.name === "string" && after.name.trim()
           ? after.name.trim()
           : "نقطة تفتيش";
+
+      const entAr = STATUS_AR[next.entrance] || next.entrance;
+      const exAr = STATUS_AR[next.exit] || next.exit;
       const title = `${name}`;
-      const body = `الحالة الجديدة: ${nextStatus}`;
+      const body = `الدخول: ${entAr}\nالخُروج: ${exAr}`;
 
       await notifyAll(title, body, {
         type: "checkpoint_update",
