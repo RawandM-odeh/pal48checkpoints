@@ -1,8 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-/// Firestore (camelCase): `entranceStatus`, `exitStatus`, `entranceUpdatedAt`, `exitUpdatedAt`.
-/// Reads legacy `updatedAt`, snake_case timestamps, and single `status` when needed.
+import '../utils/geo_distance.dart';
+
+/// Firestore: directional statuses + timestamps (camelCase أو snake_case).
+/// الاسم: `name_ar` / `name` / `name_en` أو معرّف الوثيقة إن وُجد الاسم بالعربي كـ Doc ID.
+/// المدينة: حقل `city` أو النص في `location` (لا يُقرأ `GeoPoint` كمدينة).
+/// الإحداثيات: `latitude`/`longitude` أو `lat`/`lng` أو `geo` كـ [GeoPoint].
 class Checkpoint {
   const Checkpoint({
     required this.id,
@@ -10,6 +14,8 @@ class Checkpoint {
     required this.location,
     required this.entranceStatus,
     required this.exitStatus,
+    this.latitude,
+    this.longitude,
     this.entranceUpdatedAt,
     this.exitUpdatedAt,
   });
@@ -17,6 +23,8 @@ class Checkpoint {
   final String id;
   final String name;
   final String location;
+  final double? latitude;
+  final double? longitude;
   final String entranceStatus;
   final String exitStatus;
   final DateTime? entranceUpdatedAt;
@@ -32,10 +40,13 @@ class Checkpoint {
     final ({String entrance, String exit}) dirs = readDirections(map);
     final ({DateTime? entrance, DateTime? exit}) times =
         _parseDirectionTimes(map);
+    final ({double? lat, double? lng}) coords = readCoordinates(map);
     return Checkpoint(
       id: id,
-      name: (map['name'] as String? ?? '').trim(),
-      location: (map['location'] as String? ?? '').trim(),
+      name: readDisplayName(map, id),
+      location: readCityOrLocation(map),
+      latitude: coords.lat,
+      longitude: coords.lng,
       entranceStatus: dirs.entrance,
       exitStatus: dirs.exit,
       entranceUpdatedAt: times.entrance,
@@ -43,10 +54,87 @@ class Checkpoint {
     );
   }
 
+  /// مسافة تقريبية بالكم؛ null إذا لم تُعرَف إحداثيات الحاجز.
+  double? distanceKmFrom(double userLat, double userLon) {
+    final double? lat = latitude;
+    final double? lng = longitude;
+    if (lat == null || lng == null) {
+      return null;
+    }
+    return haversineKm(lat, lng, userLat, userLon);
+  }
+
+  bool get hasCoordinates =>
+      latitude != null &&
+      longitude != null &&
+      latitude!.isFinite &&
+      longitude!.isFinite;
+
+  /// إحداثيات من حقول شائعة أو [GeoPoint] تحت `geo` / `coordinates`.
+  static ({double? lat, double? lng}) readCoordinates(Map<String, dynamic> map) {
+    final Object? g = map['geo'] ?? map['coordinates'];
+    if (g is GeoPoint) {
+      return (lat: g.latitude, lng: g.longitude);
+    }
+    final double? lat = _readCoordinate(map['latitude']) ??
+        _readCoordinate(map['lat']);
+    final double? lng = _readCoordinate(map['longitude']) ??
+        _readCoordinate(map['lng']) ??
+        _readCoordinate(map['lon']);
+    return (lat: lat, lng: lng);
+  }
+
+  static double? _readCoordinate(dynamic value) {
+    if (value is double) {
+      return value;
+    }
+    if (value is int) {
+      return value.toDouble();
+    }
+    if (value is num) {
+      return value.toDouble();
+    }
+    return null;
+  }
+
+  /// اسم الحاجز للعرض: حقول شائعة في Firestore ثم معرّف الوثيقة.
+  static String readDisplayName(Map<String, dynamic> map, String docId) {
+    final String? fromDoc = _firstNonEmptyString(map, const <String>[
+      'name_ar',
+      'nameAr',
+      'name',
+      'name_en',
+      'nameEn',
+    ]);
+    if (fromDoc != null && fromDoc.isNotEmpty) {
+      return fromDoc;
+    }
+    final String trimmedId = docId.trim();
+    if (trimmedId.isNotEmpty) {
+      return trimmedId;
+    }
+    return '';
+  }
+
+  /// مدينة أو موقع نصي: `city` ثم حقل `location` إن كان نصاً (يتجاهل GeoPoint).
+  static String readCityOrLocation(Map<String, dynamic> map) {
+    final String? city = _firstNonEmptyString(map, const <String>['city']);
+    if (city != null && city.isNotEmpty) {
+      return city;
+    }
+    final Object? loc = map['location'];
+    if (loc is String && loc.trim().isNotEmpty) {
+      return loc.trim();
+    }
+    return '';
+  }
+
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
       'name': name,
       'location': location,
+      if (latitude != null) 'latitude': latitude,
+      if (longitude != null) 'longitude': longitude,
       'entranceStatus': entranceStatus,
       'exitStatus': exitStatus,
     };

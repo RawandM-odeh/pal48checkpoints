@@ -222,7 +222,7 @@ Future<void> showCheckpointStatusSheet({
 
   await showModalBottomSheet<void>(
     context: context,
-    backgroundColor: Colors.white,
+    backgroundColor: const Color(0xFF2C2F38),
     showDragHandle: true,
     builder: (BuildContext bc) {
       return Directionality(
@@ -244,7 +244,7 @@ Future<void> showCheckpointStatusSheet({
                   textAlign: TextAlign.center,
                   style: Theme.of(bc).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
-                        color: CheckpointCardStyle.navy,
+                        color: Colors.white,
                       ),
                 ),
                 const SizedBox(height: 18),

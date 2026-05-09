@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'providers/checkpoint_provider.dart';
 import 'providers/notification_provider.dart';
+import 'providers/user_location_provider.dart';
 import 'repositories/checkpoint_repository.dart';
 import 'repositories/notification_repository.dart';
 import 'screens/admin/admin_screen.dart';
@@ -49,6 +50,9 @@ Future<void> main() async {
           create: (BuildContext context) => CheckpointProvider(
             context.read<CheckpointRepository>(),
           ),
+        ),
+        ChangeNotifierProvider<UserLocationProvider>(
+          create: (_) => UserLocationProvider(),
         ),
       ],
       child: const CheckpointAppRoot(),

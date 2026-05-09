@@ -70,5 +70,7 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>نستخدم موقعك لعرض الحواجز القريبة منك فقط.</string>
 </dict>
 </plist>

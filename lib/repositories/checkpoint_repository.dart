@@ -41,23 +41,7 @@ class CheckpointRepository {
   }
 
   static Checkpoint fromMap(String id, Map<String, dynamic> map) {
-    final ({String entrance, String exit}) dirs =
-        Checkpoint.readDirections(map);
-    return Checkpoint(
-      id: id,
-      name: (map['name'] as String? ?? '').trim(),
-      location: (map['location'] as String? ?? '').trim(),
-      entranceStatus: dirs.entrance,
-      exitStatus: dirs.exit,
-      entranceUpdatedAt: _parseDate(map['entranceUpdatedAt']),
-      exitUpdatedAt: _parseDate(map['exitUpdatedAt']),
-    );
-  }
-
-  static DateTime _parseDate(dynamic value) {
-    if (value is Timestamp) return value.toDate();
-    if (value is String) return DateTime.parse(value);
-    return DateTime.now();
+    return Checkpoint.fromMap(id, map);
   }
 
   /// [direction] is `"entrance"` or `"exit"`; [status] is `open` | `closed` | `crowded`.
