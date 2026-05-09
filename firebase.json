@@ -1,1 +1,24 @@
-{"flutter":{"platforms":{"dart":{"lib/firebase_options.dart":{"projectId":"pal48checkpoint","configurations":{"android":"1:865966306402:android:3e482e66eb21e0331bcd3b"}}},"android":{"default":{"projectId":"pal48checkpoint","appId":"1:865966306402:android:3e482e66eb21e0331bcd3b","fileOutput":"android/app/google-services.json"}}}}}
+{
+  "functions": {
+    "source": "functions"
+  },
+  "flutter": {
+    "platforms": {
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "pal48checkpoint",
+          "configurations": {
+            "android": "1:865966306402:android:3e482e66eb21e0331bcd3b"
+          }
+        }
+      },
+      "android": {
+        "default": {
+          "projectId": "pal48checkpoint",
+          "appId": "1:865966306402:android:3e482e66eb21e0331bcd3b",
+          "fileOutput": "android/app/google-services.json"
+        }
+      }
+    }
+  }
+}
