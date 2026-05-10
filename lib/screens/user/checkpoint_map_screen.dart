@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/checkpoint.dart';
 import '../../providers/checkpoint_provider.dart';
+import '../../theme/app_colors.dart';
 import '../../utils/ar_relative_time.dart';
 import '../widgets/checkpoint_card.dart';
 import '../widgets/split_checkpoint_pin.dart';
@@ -148,7 +149,7 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
   ) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF2C2F38),
+      backgroundColor: AppColors.cardLight,
       showDragHandle: true,
       isScrollControlled: true,
       builder: (BuildContext bc) {
@@ -180,7 +181,7 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
                         'اختر المدن المعروضة على الخريطة',
                         textAlign: TextAlign.center,
                         style: Theme.of(bc).textTheme.titleMedium?.copyWith(
-                              color: Colors.white,
+                              color: AppColors.textPrimaryLight,
                               fontWeight: FontWeight.w700,
                             ),
                       ),
@@ -225,10 +226,12 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
                                 });
                                 setModal(() {});
                               },
-                              activeColor: const Color(0xFF2196F3),
+                              activeColor: AppColors.brandTeal,
                               title: Text(
                                 e.value,
-                                style: const TextStyle(color: Colors.white),
+                                style: const TextStyle(
+                                  color: AppColors.textPrimaryLight,
+                                ),
                               ),
                               controlAffinity: ListTileControlAffinity.leading,
                             );
@@ -276,7 +279,7 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
   Future<void> _showCheckpointSheet(BuildContext context, Checkpoint c) async {
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF2C2F38),
+      backgroundColor: AppColors.cardLight,
       showDragHandle: true,
       builder: (BuildContext bc) {
         return Directionality(
@@ -296,7 +299,7 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
                   c.name.isEmpty ? 'بدون اسم' : c.name,
                   textAlign: TextAlign.center,
                   style: Theme.of(bc).textTheme.titleLarge?.copyWith(
-                        color: Colors.white,
+                        color: AppColors.textPrimaryLight,
                         fontWeight: FontWeight.w800,
                       ),
                 ),
@@ -306,7 +309,7 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
                     c.location.trim(),
                     textAlign: TextAlign.center,
                     style: Theme.of(bc).textTheme.bodyMedium?.copyWith(
-                          color: Colors.white60,
+                          color: AppColors.textMutedLight,
                         ),
                   ),
                 ],
@@ -426,8 +429,14 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
             right: 12,
             top: 8,
             child: Material(
-              color: const Color(0xE61A1C23),
-              borderRadius: BorderRadius.circular(12),
+              color: Colors.white.withValues(alpha: 0.96),
+              elevation: 2,
+              shadowColor: AppColors.brandTeal.withValues(alpha: 0.14),
+              surfaceTintColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: AppColors.borderSubtleLight),
+              ),
               clipBehavior: Clip.antiAlias,
               child: InkWell(
                 onTap: () => _showCityFilterSheet(context, catalog),
@@ -438,7 +447,7 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
                     children: <Widget>[
                       const Icon(
                         Icons.filter_alt_outlined,
-                        color: Color(0xFF2196F3),
+                        color: AppColors.brandTeal,
                         size: 22,
                       ),
                       const SizedBox(width: 10),
@@ -447,7 +456,7 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
                           'فلتر المدن',
                           style:
                               Theme.of(context).textTheme.titleSmall?.copyWith(
-                                    color: Colors.white,
+                                    color: AppColors.textPrimaryLight,
                                     fontWeight: FontWeight.w700,
                                   ),
                         ),
@@ -458,14 +467,14 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF2196F3).withValues(alpha: 0.25),
+                          color: AppColors.brandTeal.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
                           '${_selectedCityKeys.length}/${catalog.length}',
                           style:
                               Theme.of(context).textTheme.labelMedium?.copyWith(
-                                    color: const Color(0xFF90CAF9),
+                                    color: AppColors.brandTealDark,
                                     fontWeight: FontWeight.w700,
                                   ),
                         ),
@@ -498,13 +507,16 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
           left: 12,
           bottom: 96,
           child: Material(
-            color: const Color(0xFF2C2F38),
+            color: AppColors.cardLight,
+            elevation: 3,
+            shadowColor: AppColors.brandTeal.withValues(alpha: 0.18),
+            surfaceTintColor: Colors.transparent,
             shape: const CircleBorder(),
             clipBehavior: Clip.antiAlias,
             child: IconButton(
               tooltip: 'موقعي',
               onPressed: _goToMyLocation,
-              icon: const Icon(Icons.my_location, color: Color(0xFF2196F3)),
+              icon: const Icon(Icons.my_location, color: AppColors.brandTeal),
             ),
           ),
         ),
@@ -512,9 +524,14 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
           right: 12,
           bottom: 96,
           child: Material(
-            color: const Color(0xFF2C2F38),
+            color: AppColors.cardLight.withValues(alpha: 0.97),
             elevation: 2,
-            borderRadius: BorderRadius.circular(12),
+            shadowColor: Colors.black.withValues(alpha: 0.08),
+            surfaceTintColor: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: AppColors.borderSubtleLight),
+            ),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               child: Column(
@@ -524,7 +541,7 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
                   Text(
                     'الدبوس',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: Colors.white54,
+                          color: AppColors.textMutedLight,
                         ),
                   ),
                   const SizedBox(height: 6),
@@ -533,7 +550,7 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
                   Text(
                     'النصف الأيسر = دخول · الأيمن = خروج',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: Colors.white38,
+                          color: AppColors.textMutedLight,
                           fontSize: 10,
                         ),
                   ),
@@ -548,15 +565,22 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
             right: 16,
             top: catalog.isNotEmpty ? 68 : 12,
             child: Material(
-              color: const Color(0xE61A1C23),
-              borderRadius: BorderRadius.circular(12),
+              color: Colors.white.withValues(alpha: 0.96),
+              elevation: 2,
+              shadowColor: AppColors.brandTeal.withValues(alpha: 0.12),
+              surfaceTintColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: AppColors.borderSubtleLight),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: Text(
                   'لا توجد إحداثيات على الحواجز بعد — أضف latitude/longitude في Firestore.',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.amber.shade200,
+                        color: Colors.amber.shade900,
+                        fontWeight: FontWeight.w600,
                       ),
                 ),
               ),
@@ -568,15 +592,22 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
             right: 16,
             top: catalog.isNotEmpty ? 68 : 12,
             child: Material(
-              color: const Color(0xE61A1C23),
-              borderRadius: BorderRadius.circular(12),
+              color: Colors.white.withValues(alpha: 0.96),
+              elevation: 2,
+              shadowColor: AppColors.brandTeal.withValues(alpha: 0.12),
+              surfaceTintColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: AppColors.borderSubtleLight),
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: Text(
                   'لم يُحدَّد عرض أي مدينة — اضغط «فلتر المدن» واختر المدن التي تريدها على الخريطة.',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.lightBlue.shade100,
+                        color: Colors.blue.shade800,
+                        fontWeight: FontWeight.w600,
                       ),
                 ),
               ),
@@ -598,7 +629,7 @@ class _SplitLegendPreview extends StatelessWidget {
           height: 14,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.white24),
+            border: Border.all(color: AppColors.borderSubtleLight),
           ),
           clipBehavior: Clip.antiAlias,
           child: const Row(
@@ -623,7 +654,7 @@ class _SplitLegendPreview extends StatelessWidget {
           'كل نصف بلون حالة ذلك الاتجاه (سالك، أزمة، مغلق، جيش، مستوطنون)',
           textAlign: TextAlign.right,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: Colors.white38,
+                color: AppColors.textMutedLight,
                 fontSize: 10,
               ),
         ),
@@ -655,7 +686,7 @@ class _SheetDirectionRow extends StatelessWidget {
           label,
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: Colors.white60,
+                color: AppColors.textMutedLight,
                 fontWeight: FontWeight.w700,
               ),
         ),
@@ -670,7 +701,7 @@ class _SheetDirectionRow extends StatelessWidget {
               decoration: BoxDecoration(
                 color: styl.bg.withValues(alpha: 0.35),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white24),
+                border: Border.all(color: AppColors.borderSubtleLight),
               ),
               child: Column(
                 children: <Widget>[
@@ -685,13 +716,14 @@ class _SheetDirectionRow extends StatelessWidget {
                   Text(
                     arabicRelativeSince(updated),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.white54,
+                          color: AppColors.textMutedLight,
                         ),
                   ),
                   Text(
                     'اضغط لتغيير الحالة',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: const Color(0xFF2196F3),
+                          color: AppColors.brandTeal,
+                          fontWeight: FontWeight.w700,
                         ),
                   ),
                 ],

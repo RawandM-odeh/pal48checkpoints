@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 
 import '../../models/checkpoint.dart';
 import '../../providers/checkpoint_provider.dart';
+import '../../theme/app_colors.dart';
 import '../../utils/ar_relative_time.dart';
+import '../../utils/guest_session.dart';
 
 abstract final class CheckpointCardStyle {
   static const Color navy = Color(0xFF163E6C);
@@ -237,6 +239,12 @@ Future<void> showCheckpointStatusSheet({
   required String direction,
   CheckpointUpdateSource updateSource = CheckpointUpdateSource.user,
 }) async {
+  if (!await ensureCanMakeCheckpointChanges(context)) {
+    return;
+  }
+  if (!context.mounted) {
+    return;
+  }
   final CheckpointProvider provider = context.read<CheckpointProvider>();
   final String title = direction == 'entrance'
       ? 'تغيير حالة الدخول'
@@ -244,7 +252,7 @@ Future<void> showCheckpointStatusSheet({
 
   await showModalBottomSheet<void>(
     context: context,
-    backgroundColor: const Color(0xFF2C2F38),
+    backgroundColor: AppColors.cardLight,
     showDragHandle: true,
     builder: (BuildContext bc) {
       return Directionality(
@@ -266,7 +274,7 @@ Future<void> showCheckpointStatusSheet({
                   textAlign: TextAlign.center,
                   style: Theme.of(bc).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w700,
-                        color: Colors.white,
+                        color: AppColors.textPrimaryLight,
                       ),
                 ),
                 const SizedBox(height: 14),

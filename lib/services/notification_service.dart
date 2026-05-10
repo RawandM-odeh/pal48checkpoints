@@ -62,7 +62,7 @@ abstract final class NotificationService {
       if (kIsWeb) {
         return;
       }
-      if (user == null) {
+      if (user == null || user.isAnonymous) {
         return;
       }
       unawaited(_persistTokenForUid(user.uid));
@@ -70,9 +70,9 @@ abstract final class NotificationService {
 
     if (!kIsWeb) {
       _messaging.onTokenRefresh.listen((String token) async {
-        final String? uid = FirebaseAuth.instance.currentUser?.uid;
-        if (uid != null && uid.isNotEmpty) {
-          await _writeFcmToken(uid, token);
+        final User? u = FirebaseAuth.instance.currentUser;
+        if (u != null && !u.isAnonymous && u.uid.isNotEmpty) {
+          await _writeFcmToken(u.uid, token);
         }
       });
 
@@ -136,7 +136,9 @@ abstract final class NotificationService {
 
   static Future<void> _persistInitialTokenIfSignedIn() async {
     final User? user = FirebaseAuth.instance.currentUser;
-    if (user != null && user.uid.isNotEmpty) {
+    if (user != null &&
+        !user.isAnonymous &&
+        user.uid.isNotEmpty) {
       await _persistTokenForUid(user.uid);
     }
   }
@@ -153,10 +155,14 @@ abstract final class NotificationService {
   }
 
   static Future<void> _writeFcmToken(String uid, String token) async {
-    await FirebaseFirestore.instance.collection('users').doc(uid).set(
-          <String, dynamic>{'fcmToken': token},
-          SetOptions(merge: true),
-        );
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(uid).set(
+            <String, dynamic>{'fcmToken': token},
+            SetOptions(merge: true),
+          );
+    } catch (e, st) {
+      debugPrint('[FCM] write token to Firestore failed: $e\n$st');
+    }
   }
 
   static Future<void> _showForegroundLocalNotification(

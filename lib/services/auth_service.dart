@@ -36,6 +36,28 @@ class AuthService {
     return _auth.signInWithCredential(credential);
   }
 
+  /// Requires **Email/Password** enabled in Firebase Console → Authentication → Sign-in method.
+  Future<UserCredential> signInWithEmailAndPassword({
+    required String email,
+    required String password,
+  }) {
+    return _auth.signInWithEmailAndPassword(
+      email: email.trim(),
+      password: password,
+    );
+  }
+
+  /// Creates a Firebase Auth account; [FirestoreService.getOrCreateUserRole] then creates `users/{uid}`.
+  Future<UserCredential> createUserWithEmailAndPassword({
+    required String email,
+    required String password,
+  }) {
+    return _auth.createUserWithEmailAndPassword(
+      email: email.trim(),
+      password: password,
+    );
+  }
+
   Future<void> signOut() async {
     if (!kIsWeb) {
       await _mobileGoogleSignIn?.signOut();

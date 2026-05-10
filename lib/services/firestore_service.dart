@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -25,16 +26,31 @@ class FirestoreService {
     required String uid,
     required String email,
   }) async {
+    final User? authUser = FirebaseAuth.instance.currentUser;
+    if (authUser == null || authUser.uid != uid) {
+      throw StateError('getOrCreateUserRole: no matching signed-in user');
+    }
+    final bool isAnonymous = authUser.isAnonymous;
+
     final DocumentReference<Map<String, dynamic>> userDoc =
         _db.collection('users').doc(uid);
     final DocumentSnapshot<Map<String, dynamic>> snapshot = await userDoc.get();
 
     if (!snapshot.exists) {
+      final String role = isAnonymous ? 'guest' : 'user';
       await userDoc.set({
         'email': email,
-        'role': 'user',
+        'role': role,
       });
-      return 'user';
+      return role;
+    }
+
+    if (isAnonymous) {
+      final String? existing = snapshot.data()?['role'] as String?;
+      if (existing != 'guest') {
+        await userDoc.update(<String, Object?>{'role': 'guest'});
+      }
+      return 'guest';
     }
 
     return snapshot.data()?['role'] as String? ?? 'user';

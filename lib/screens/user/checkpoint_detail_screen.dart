@@ -2,18 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/checkpoint.dart';
+import '../../theme/app_colors.dart';
 import '../../providers/checkpoint_provider.dart';
 import '../../providers/user_location_provider.dart';
 import '../../utils/ar_relative_time.dart';
+import '../../utils/guest_session.dart';
 import '../widgets/checkpoint_card.dart';
 
-/// ألوان قريبة من مرجع التصميم (#1a1f2b، #2563eb، #22c55e).
-const Color _pageBg = Color(0xFF1A1F2B);
-const Color _surfaceCard = Color(0xFF252B38);
-const Color _surfaceElevated = Color(0xFF2C3344);
-const Color _accentBlue = Color(0xFF2563EB);
-const Color _successGreen = Color(0xFF22C55E);
-const Color _headerBarBg = Color(0xFF232936);
+/// واجهة فاتحة ناعمة متناغمة مع ثيم التطبيق.
+const Color _pageBg = AppColors.shellBackground;
+const Color _surfaceCard = AppColors.cardLight;
+const Color _surfaceElevated = AppColors.surfaceSoft;
+const Color _accentBlue = AppColors.brandTeal;
+const Color _successGreen = Color(0xFF16A34A);
+const Color _headerBarBg = AppColors.surfaceSoft;
 const double _kUpdateRadiusKm = 1.5;
 
 /// شاشة تفاصيل حاجز — تبويبات: آخر التحديثات، أرسل تحديث، معلومات الحاجز.
@@ -214,7 +216,7 @@ class _DetailHeader extends StatelessWidget {
           _RoundIconButton(
             backgroundColor: _headerBarBg,
             icon: Icons.close_rounded,
-            iconColor: Colors.white,
+            iconColor: AppColors.textPrimaryLight,
             onPressed: onClose,
           ),
           Expanded(
@@ -224,7 +226,7 @@ class _DetailHeader extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                color: Colors.white,
+                color: AppColors.textPrimaryLight,
                 fontWeight: FontWeight.w800,
                 fontSize: 18,
               ),
@@ -320,7 +322,7 @@ class _CurrentStatusSummary extends StatelessWidget {
               VerticalDivider(
                 width: 24,
                 thickness: 1,
-                color: Colors.white.withValues(alpha: 0.12),
+                color: AppColors.borderSubtleLight,
               ),
               Expanded(
                 child: _StatusHalf(
@@ -376,7 +378,7 @@ class _StatusHalf extends StatelessWidget {
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            color: Colors.white.withValues(alpha: 0.88),
+            color: AppColors.textPrimaryLight,
             fontWeight: FontWeight.w700,
             height: 1.25,
           ),
@@ -421,7 +423,7 @@ class _StatusHalf extends StatelessWidget {
           arabicRelativeSince(updatedAt),
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Colors.white54,
+            color: AppColors.textMutedLight,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -431,7 +433,7 @@ class _StatusHalf extends StatelessWidget {
             sourceFootnote!,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white38,
+                  color: AppColors.textMutedLight,
                   fontWeight: FontWeight.w600,
                   fontSize: 11,
                 ),
@@ -511,7 +513,7 @@ class _TabPill extends StatelessWidget {
             border: Border.all(
               color: selected
                   ? Colors.transparent
-                  : Colors.white.withValues(alpha: 0.22),
+                  : AppColors.borderSubtleLight,
             ),
           ),
           child: Column(
@@ -520,7 +522,7 @@ class _TabPill extends StatelessWidget {
               Icon(
                 icon,
                 size: 18,
-                color: selected ? Colors.white : Colors.white70,
+                color: selected ? Colors.white : AppColors.textMutedLight,
               ),
               const SizedBox(height: 4),
               Text(
@@ -529,7 +531,7 @@ class _TabPill extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: selected ? Colors.white : Colors.white70,
+                  color: selected ? Colors.white : AppColors.textMutedLight,
                   fontWeight: FontWeight.w700,
                   fontSize: 10.5,
                   height: 1.15,
@@ -693,7 +695,7 @@ class _LatestUpdatesPanel extends StatelessWidget {
                   child: Text(
                     'التحديثات الأخيرة',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: AppColors.textPrimaryLight,
                       fontWeight: FontWeight.w800,
                       fontSize: 16,
                     ),
@@ -748,7 +750,7 @@ class _TimelineCard extends StatelessWidget {
             entry.relativeTime,
             textAlign: TextAlign.right,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Colors.white54,
+              color: AppColors.textMutedLight,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -760,7 +762,7 @@ class _TimelineCard extends StatelessWidget {
                 line,
                 textAlign: TextAlign.right,
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: AppColors.textPrimaryLight,
                   fontWeight: FontWeight.w700,
                   fontSize: 15,
                   height: 1.35,
@@ -774,7 +776,7 @@ class _TimelineCard extends StatelessWidget {
               entry.footNote!,
               textAlign: TextAlign.right,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.white54,
+                color: AppColors.textMutedLight,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -950,6 +952,12 @@ class _SendUpdatePanelState extends State<_SendUpdatePanel> {
   }
 
   Future<void> _submit(BuildContext context) async {
+    if (!await ensureCanMakeCheckpointChanges(context)) {
+      return;
+    }
+    if (!context.mounted) {
+      return;
+    }
     final CheckpointProvider provider = context.read<CheckpointProvider>();
     final Checkpoint c = widget.checkpoint;
     setState(() => _submitting = true);
@@ -1010,7 +1018,7 @@ class _SendUpdatePanelState extends State<_SendUpdatePanel> {
                     'شاركونا حالة الطريق 💛',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: Colors.white,
+                      color: AppColors.textPrimaryLight,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
@@ -1020,7 +1028,9 @@ class _SendUpdatePanelState extends State<_SendUpdatePanel> {
                     textAlign: TextAlign.center,
                     style: Theme.of(
                       context,
-                    ).textTheme.bodySmall?.copyWith(color: Colors.white54),
+                    ).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textMutedLight,
+                        ),
                   ),
                   const SizedBox(height: 20),
                   _DirectionStatusPicker(
@@ -1040,7 +1050,7 @@ class _SendUpdatePanelState extends State<_SendUpdatePanel> {
                     child: Text(
                       'تفاصيل إضافية:',
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        color: Colors.white,
+                        color: AppColors.textPrimaryLight,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -1070,16 +1080,17 @@ class _SendUpdatePanelState extends State<_SendUpdatePanel> {
                         },
                         backgroundColor: _surfaceElevated,
                         selectedColor: _accentBlue.withValues(alpha: 0.35),
-                        checkmarkColor: Colors.white,
+                        checkmarkColor: _accentBlue,
                         labelStyle: TextStyle(
-                          color: on ? Colors.white : Colors.white70,
+                          color: on
+                              ? AppColors.textPrimaryLight
+                              : AppColors.textMutedLight,
                           fontWeight: FontWeight.w600,
                           fontSize: 13,
                         ),
                         side: BorderSide(
-                          color: on
-                              ? _accentBlue
-                              : Colors.white.withValues(alpha: 0.2),
+                          color:
+                              on ? _accentBlue : AppColors.borderSubtleLight,
                         ),
                       );
                     }),
@@ -1150,7 +1161,7 @@ class _ProximityBanner extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
-          color: const Color(0xFF263238),
+          color: AppColors.shellSurfaceTint,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: _accentBlue.withValues(alpha: 0.35),
@@ -1168,7 +1179,7 @@ class _ProximityBanner extends StatelessWidget {
                 'وضع الإدارة — يمكن إرسال التحديث دون التحقق من موقعك أو المسافة.',
                 textAlign: TextAlign.right,
                 style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.92),
+                  color: AppColors.textPrimaryLight,
                   fontWeight: FontWeight.w600,
                   fontSize: 12.5,
                   height: 1.35,
@@ -1212,10 +1223,10 @@ class _ProximityBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF3D3A28),
+        color: const Color(0xFFFFF9E8),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFFFFE082).withValues(alpha: 0.35),
+          color: Colors.amber.shade200,
         ),
       ),
       child: Row(
@@ -1234,8 +1245,8 @@ class _ProximityBanner extends StatelessWidget {
               textAlign: TextAlign.right,
               style: TextStyle(
                 color: messageIsWarningRed
-                    ? const Color(0xFFFF8A80)
-                    : Colors.white.withValues(alpha: 0.9),
+                    ? Colors.red.shade700
+                    : AppColors.textPrimaryLight,
                 fontWeight: FontWeight.w600,
                 fontSize: 12.5,
                 height: 1.35,
@@ -1301,7 +1312,7 @@ class _DirectionStatusPicker extends StatelessWidget {
           heading,
           textAlign: TextAlign.right,
           style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            color: Colors.white.withValues(alpha: 0.92),
+            color: AppColors.textPrimaryLight,
             fontWeight: FontWeight.w800,
           ),
         ),
@@ -1338,10 +1349,10 @@ class _CircleStatusOption extends StatelessWidget {
   Widget build(BuildContext context) {
     final Color iconColor = selected
         ? Colors.white
-        : Colors.white.withValues(alpha: 0.45);
+        : AppColors.textMutedLight;
     final Color labelColor = selected
-        ? Colors.white
-        : Colors.white.withValues(alpha: 0.5);
+        ? AppColors.textPrimaryLight
+        : AppColors.textMutedLight;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -1360,7 +1371,7 @@ class _CircleStatusOption extends StatelessWidget {
                 border: Border.all(
                   color: selected
                       ? _accentBlue
-                      : Colors.white.withValues(alpha: 0.12),
+                      : AppColors.borderSubtleLight,
                   width: selected ? 2 : 1,
                 ),
               ),
@@ -1406,7 +1417,7 @@ class _CheckpointInfoPanel extends StatelessWidget {
         decoration: BoxDecoration(
           color: _surfaceCard,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          border: Border.all(color: AppColors.borderSubtleLight),
         ),
         child: Column(
           key: ValueKey<String>(checkpoint.id),
@@ -1514,7 +1525,7 @@ class _ReportErrorCard extends StatelessWidget {
                     const Text(
                       'بلّغ عن خطأ',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: AppColors.textPrimaryLight,
                         fontWeight: FontWeight.w800,
                         fontSize: 16,
                       ),
@@ -1523,7 +1534,7 @@ class _ReportErrorCard extends StatelessWidget {
                     Text(
                       'ساعدنا بتحسين بيانات الحاجز',
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.55),
+                        color: AppColors.textMutedLight,
                         fontWeight: FontWeight.w500,
                         fontSize: 13,
                       ),
@@ -1533,7 +1544,7 @@ class _ReportErrorCard extends StatelessWidget {
               ),
               Icon(
                 Icons.chevron_left_rounded,
-                color: Colors.white.withValues(alpha: 0.7),
+                color: AppColors.textMutedLight,
                 size: 28,
               ),
             ],
@@ -1599,7 +1610,7 @@ class _InfoActionTile extends StatelessWidget {
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: AppColors.textPrimaryLight,
                     fontWeight: FontWeight.w700,
                     fontSize: 13.5,
                     height: 1.25,
