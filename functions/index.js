@@ -6,16 +6,26 @@ admin.initializeApp();
 const STATUS_AR = Object.freeze({
   open: "مفتوح",
   closed: "مغلق",
-  crowded: "مزدحم",
+  crowded: "أزمة",
+  army_present: "جيش",
+  settlers_present: "مستوطنون",
 });
 
-/** Only open | closed | crowded; otherwise [fallback] (default open). */
+const ALLOWED_STATUSES = new Set([
+  "open",
+  "closed",
+  "crowded",
+  "army_present",
+  "settlers_present",
+]);
+
+/** Normalize to an allowed status; otherwise [fallback] (default open). */
 function normalizeStatus(raw, fallback = "open") {
   if (typeof raw !== "string") {
     return fallback;
   }
   const v = raw.trim().toLowerCase();
-  if (v === "open" || v === "closed" || v === "crowded") {
+  if (ALLOWED_STATUSES.has(v)) {
     return v;
   }
   return fallback;

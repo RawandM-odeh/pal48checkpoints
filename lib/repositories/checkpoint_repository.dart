@@ -4,7 +4,7 @@ import '../models/checkpoint.dart';
 
 class CheckpointRepository {
   CheckpointRepository({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+    : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _firestore;
 
@@ -12,18 +12,18 @@ class CheckpointRepository {
       _firestore.collection('checkpoints');
 
   Stream<List<Checkpoint>> watchCheckpoints() {
-    return _collection.snapshots().map(
-          (QuerySnapshot<Map<String, dynamic>> snap) {
-            final List<Checkpoint> list = snap.docs
-                .map(Checkpoint.fromDocument)
-                .toList(growable: false);
-            list.sort(
-              (Checkpoint a, Checkpoint b) =>
-                  a.name.toLowerCase().compareTo(b.name.toLowerCase()),
-            );
-            return list;
-          },
-        );
+    return _collection.snapshots().map((
+      QuerySnapshot<Map<String, dynamic>> snap,
+    ) {
+      final List<Checkpoint> list = snap.docs
+          .map(Checkpoint.fromDocument)
+          .toList(growable: false);
+      list.sort(
+        (Checkpoint a, Checkpoint b) =>
+            a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+      );
+      return list;
+    });
   }
 
   static Map<String, dynamic> toMap({
@@ -44,19 +44,20 @@ class CheckpointRepository {
     return Checkpoint.fromMap(id, map);
   }
 
-  /// [direction] is `"entrance"` or `"exit"`; [status] is `open` | `closed` | `crowded`.
+  /// [direction] is `"entrance"` or `"exit"`; [status] is a [CheckpointStatus] value.
+  /// When [tags] is non-null, writes `reportTags` (normalized); when null, leaves field unchanged.
   Future<void> updateStatus(
     String id,
     String direction,
-    String status,
-  ) async {
+    String status, {
+    List<String>? tags,
+  }) async {
     final String dir = direction.toLowerCase().trim();
     if (dir != 'entrance' && dir != 'exit') {
       throw ArgumentError('direction must be "entrance" or "exit"');
     }
     final String ns = CheckpointStatus.normalize(status);
-    final DocumentReference<Map<String, dynamic>> docRef =
-        _collection.doc(id);
+    final DocumentReference<Map<String, dynamic>> docRef = _collection.doc(id);
 
     await _firestore.runTransaction((Transaction txn) async {
       final DocumentSnapshot<Map<String, dynamic>> snap = await txn.get(docRef);
@@ -64,7 +65,9 @@ class CheckpointRepository {
         throw StateError('Checkpoint not found');
       }
       final Map<String, dynamic> d = snap.data()!;
-      final ({String entrance, String exit}) dirs = Checkpoint.readDirections(d);
+      final ({String entrance, String exit}) dirs = Checkpoint.readDirections(
+        d,
+      );
       final String ne = dir == 'entrance' ? ns : dirs.entrance;
       final String nx = dir == 'exit' ? ns : dirs.exit;
 
@@ -76,6 +79,11 @@ class CheckpointRepository {
         patch['entranceUpdatedAt'] = FieldValue.serverTimestamp();
       } else {
         patch['exitUpdatedAt'] = FieldValue.serverTimestamp();
+      }
+      if (tags != null) {
+        patch['reportTags'] = List<String>.from(
+          CheckpointReportTag.normalizeList(tags),
+        );
       }
       txn.update(docRef, patch);
     });

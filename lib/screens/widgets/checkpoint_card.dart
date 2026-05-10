@@ -208,7 +208,7 @@ class _StatusBadge extends StatelessWidget {
   }
 }
 
-/// Bottom sheet with three big buttons (open / closed / crowded).
+/// Bottom sheet: all [CheckpointStatus] values.
 /// Calls [CheckpointProvider.updateStatus] on tap and pops.
 Future<void> showCheckpointStatusSheet({
   required BuildContext context,
@@ -247,29 +247,37 @@ Future<void> showCheckpointStatusSheet({
                         color: Colors.white,
                       ),
                 ),
-                const SizedBox(height: 18),
-                _SheetButton(
-                  label: '✓ سالك',
-                  status: CheckpointStatus.open,
-                  onTap: () =>
-                      _applyStatus(bc, context, provider, checkpoint, direction,
-                          CheckpointStatus.open),
-                ),
-                const SizedBox(height: 10),
-                _SheetButton(
-                  label: '✗ مغلق',
-                  status: CheckpointStatus.closed,
-                  onTap: () =>
-                      _applyStatus(bc, context, provider, checkpoint, direction,
-                          CheckpointStatus.closed),
-                ),
-                const SizedBox(height: 10),
-                _SheetButton(
-                  label: '~ مزدحم',
-                  status: CheckpointStatus.crowded,
-                  onTap: () =>
-                      _applyStatus(bc, context, provider, checkpoint, direction,
-                          CheckpointStatus.crowded),
+                const SizedBox(height: 14),
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.sizeOf(bc).height * 0.55,
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        for (int i = 0;
+                            i < CheckpointStatus.all.length;
+                            i++) ...<Widget>[
+                          if (i > 0) const SizedBox(height: 10),
+                          _SheetButton(
+                            label:
+                                CheckpointStatus.badgeLabelAr(CheckpointStatus.all[i]),
+                            status: CheckpointStatus.all[i],
+                            onTap: () => _applyStatus(
+                              bc,
+                              context,
+                              provider,
+                              checkpoint,
+                              direction,
+                              CheckpointStatus.all[i],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
