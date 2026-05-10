@@ -21,7 +21,6 @@ import 'checkpoint_list.dart';
 import 'checkpoint_map_screen.dart';
 import 'checkpoint_update_picker_screen.dart';
 import 'saved_checkpoints_screen.dart';
-import 'favorites_screen.dart';
 
 /// هيدر تركوزي + هيكل فاتح ناعم.
 abstract final class _PalUi {
@@ -185,18 +184,6 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
     );
   }
 
-  Future<void> _openFavoritesIfAllowed() async {
-    if (!await ensureLoggedInForFavorites(context)) {
-      return;
-    }
-    if (!mounted) {
-      return;
-    }
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const FavoritesScreen()));
-  }
-
   Future<void> _openSavedCheckpointsScreen() async {
     if (!canUserMakeCheckpointWrites) {
       await showSavedLoginRequiredDialog(context);
@@ -308,7 +295,6 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
         _BlueHeader(
           savedHasBookmarks: saved.ids.isNotEmpty,
           onSavedPressed: () => unawaited(_openSavedCheckpointsScreen()),
-          onFavoritesPressed: () => unawaited(_openFavoritesIfAllowed()),
           onMenuPressed: () async {
             await showModalBottomSheet<void>(
               context: context,
@@ -881,15 +867,13 @@ class _MergedInboxRow {
 class _BlueHeader extends StatelessWidget {
   const _BlueHeader({
     required this.onMenuPressed,
-    required this.onFavoritesPressed,
     required this.savedHasBookmarks,
     required this.onSavedPressed,
   });
 
   final VoidCallback onMenuPressed;
-  final VoidCallback onFavoritesPressed;
 
-  /// أيقونة «المثبتة» البيضاء فقط بجانب المفضلة.
+  /// تمييز بصري عند وجود حواجز مثبّتة.
   final bool savedHasBookmarks;
   final VoidCallback onSavedPressed;
 
@@ -925,44 +909,22 @@ class _BlueHeader extends StatelessWidget {
           ),
           Align(
             alignment: Alignment.centerLeft,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              textDirection: TextDirection.ltr,
-              children: <Widget>[
-                IconButton(
-                  tooltip: 'المفضلة',
-                  onPressed: onFavoritesPressed,
-                  visualDensity: VisualDensity.compact,
-                  constraints: const BoxConstraints(
-                    minWidth: 42,
-                    minHeight: 42,
-                  ),
-                  padding: EdgeInsets.zero,
-                  icon: Icon(
-                    Icons.favorite_border_rounded,
-                    color: Colors.white.withValues(alpha: 0.95),
-                    size: 26,
-                  ),
-                ),
-                const SizedBox(width: 2),
-                IconButton(
-                  tooltip: 'المثبتة',
-                  onPressed: onSavedPressed,
-                  visualDensity: VisualDensity.compact,
-                  constraints: const BoxConstraints(
-                    minWidth: 42,
-                    minHeight: 42,
-                  ),
-                  padding: EdgeInsets.zero,
-                  icon: Icon(
-                    savedHasBookmarks
-                        ? Icons.bookmark_rounded
-                        : Icons.bookmark_border_rounded,
-                    color: Colors.white.withValues(alpha: 0.95),
-                    size: 26,
-                  ),
-                ),
-              ],
+            child: IconButton(
+              tooltip: 'المثبتة',
+              onPressed: onSavedPressed,
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints(
+                minWidth: 42,
+                minHeight: 42,
+              ),
+              padding: EdgeInsets.zero,
+              icon: Icon(
+                savedHasBookmarks
+                    ? Icons.bookmark_rounded
+                    : Icons.bookmark_border_rounded,
+                color: Colors.white.withValues(alpha: 0.95),
+                size: 26,
+              ),
             ),
           ),
           Text(

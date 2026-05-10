@@ -228,8 +228,6 @@ class _LiveSavedCard extends StatelessWidget {
       subtitleMaxLines: 12,
       isSaved: true,
       onSavedTap: () async => onRemovePinned(),
-      isFavorite: false,
-      onFavoriteTap: null,
       onDirectionTap: (String direction) {
         showCheckpointStatusSheet(
           context: context,

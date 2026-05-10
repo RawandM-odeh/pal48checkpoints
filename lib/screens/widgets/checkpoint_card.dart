@@ -14,6 +14,9 @@ abstract final class CheckpointCardStyle {
   /// ارتفاع خلية الشبكة في الإدارة (محتوى البطاقة أقل؛ المحاذاة للأعلى لتقليل الفراغ).
   /// رتل إضافي يمنع overflow عند وجود حاشية المصدر أو اختلاف بسيط في الخط.
   static const double adminCardHeight = 292;
+  /// قائمة مستخدم عمودَين: شريحة أقل ارتفاعاً لشكل أكثر عرضاً (أقلّ «طول»).
+  static const double userTwinRowStripHeight = 104;
+  static const double userTwinRowStripHeightCompact = 96;
   /// Entrance/exit row: fixed height so we avoid [IntrinsicHeight], which breaks
   /// when descendants use [LayoutBuilder] (Flutter Web intrinsic passes).
   static const double directionStripHeight = 126;
@@ -33,16 +36,28 @@ class CheckpointCard extends StatelessWidget {
     required this.checkpoint,
     required this.onStatusBadgeTap,
     this.trailing,
+    this.headerEnd,
     this.footer,
     this.onCardTap,
     this.appearance = CheckpointCardAppearance.light,
+    this.directionStripHeight,
+    this.detailCaption,
   });
 
   final Checkpoint checkpoint;
   final void Function(String direction) onStatusBadgeTap;
 
+  /// When set (e.g. الصفَّين الرئيسيتين)، يقلّل ارتفاع منطقة الدخول/الخروج.
+  final double? directionStripHeight;
+
+  /// سطر تحت عنوان الحاجز (مثلاً بعد «الأقرب» قبل الفاصل).
+  final String? detailCaption;
+
   /// Replaces the chevron in the top-left (e.g., admin popup menu).
   final Widget? trailing;
+
+  /// زر أو أيقونة أعلى يمين البطاقة (مثلاً «مثبتة») — خارج [onCardTap] حتى لا يفتح التفاصيل.
+  final Widget? headerEnd;
 
   /// Optional row below the badges (e.g., admin action buttons).
   final Widget? footer;
@@ -67,45 +82,80 @@ class CheckpointCard extends StatelessWidget {
         ? Colors.white.withValues(alpha: 0.12)
         : Colors.grey.shade300;
 
-    final Widget mainColumn = Column(
+    final String? cap = detailCaption?.trim();
+    final bool hasCaption = cap != null && cap.isNotEmpty;
+    final double stripH =
+        directionStripHeight ?? CheckpointCardStyle.directionStripHeight;
+
+    final double titlePadEnd = headerEnd != null ? 38 : 32;
+
+    final Widget headerTitleRow = SizedBox(
+      height: 28,
+      child: Stack(
+        alignment: Alignment.center,
+        children: <Widget>[
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: trailing ??
+                  Icon(
+                    Icons.chevron_left_rounded,
+                    color: chevronColor,
+                    size: 26,
+                  ),
+            ),
+          ),
+          if (headerEnd != null)
+            Positioned(
+              right: 0,
+              top: 0,
+              bottom: 0,
+              child: Center(child: headerEnd),
+            ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(32, 0, titlePadEnd, 0),
+            child: Text(
+              checkpoint.name.isEmpty ? 'بدون اسم' : checkpoint.name,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: titleColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    final Widget cardBodyBelowHeader = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        SizedBox(
-          height: 28,
-          child: Stack(
-            alignment: Alignment.center,
-            children: <Widget>[
-              Positioned(
-                left: 0,
-                top: 0,
-                bottom: 0,
-                child: trailing ??
-                    Icon(
-                      Icons.chevron_left_rounded,
-                      color: chevronColor,
-                      size: 26,
-                    ),
+        if (hasCaption) ...<Widget>[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 2, 4, 0),
+            child: Text(
+              cap,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: dark
+                    ? Colors.white54
+                    : CheckpointCardStyle.navy.withValues(alpha: 0.55),
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: Text(
-                  checkpoint.name.isEmpty ? 'بدون اسم' : checkpoint.name,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    color: titleColor,
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
-        Divider(height: 16, thickness: 1, color: dividerColor),
+          const SizedBox(height: 6),
+        ],
+        Divider(height: hasCaption ? 12 : 16, thickness: 1, color: dividerColor),
         SizedBox(
-          height: CheckpointCardStyle.directionStripHeight,
+          height: stripH,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             textDirection: TextDirection.rtl,
@@ -163,6 +213,7 @@ class CheckpointCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
+            headerTitleRow,
             if (onCardTap != null)
               Expanded(
                 child: InkWell(
@@ -171,7 +222,7 @@ class CheckpointCard extends StatelessWidget {
                       BorderRadius.circular(CheckpointCardStyle.radius - 2),
                   child: Align(
                     alignment: Alignment.topCenter,
-                    child: mainColumn,
+                    child: cardBodyBelowHeader,
                   ),
                 ),
               )
@@ -179,7 +230,7 @@ class CheckpointCard extends StatelessWidget {
               Expanded(
                 child: Align(
                   alignment: Alignment.topCenter,
-                  child: mainColumn,
+                  child: cardBodyBelowHeader,
                 ),
               ),
             if (footer != null) ...<Widget>[

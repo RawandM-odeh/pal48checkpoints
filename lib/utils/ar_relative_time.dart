@@ -5,6 +5,63 @@ const int _kMinutesPerHour = 60;
 const int _kHoursPerDay = 24;
 const int _kMinutesPerDay = _kMinutesPerHour * _kHoursPerDay;
 
+/// وقت التحديث لشاشة تفاصيل الحاجز: ما دام العمر ≤ ساعة يُعرَض «منذ …»، وبعدها **12 ساعة + ص/م + اسم اليوم**
+/// بتوقيت الجهاز (مثل `2:51 م، الخميس`).
+String arabicRelativeOrClockSince(DateTime? updated) {
+  if (updated == null) {
+    return 'لا وقت محدَّث';
+  }
+
+  Duration diff = DateTime.now().difference(updated);
+  if (diff.isNegative) {
+    diff = Duration.zero;
+  }
+
+  final int totalMinutes = diff.inMinutes;
+  if (totalMinutes < 1) {
+    return 'الآن';
+  }
+  if (totalMinutes <= _kMinutesPerHour) {
+    return _arabicLessThanOneDayPhrase(totalMinutes);
+  }
+  return _arabic12hWithWeekday(updated.toLocal());
+}
+
+String _weekdayNameAr(DateTime dt) {
+  switch (dt.weekday) {
+    case DateTime.saturday:
+      return 'السبت';
+    case DateTime.sunday:
+      return 'الأحد';
+    case DateTime.monday:
+      return 'الإثنين';
+    case DateTime.tuesday:
+      return 'الثلاثاء';
+    case DateTime.wednesday:
+      return 'الأربعاء';
+    case DateTime.thursday:
+      return 'الخميس';
+    case DateTime.friday:
+      return 'الجمعة';
+    default:
+      return '';
+  }
+}
+
+String _arabic12hWithWeekday(DateTime local) {
+  final int h24 = local.hour;
+  final int minute = local.minute;
+  final bool usePm = h24 >= 12;
+  int h12 = h24 % 12;
+  if (h12 == 0) {
+    h12 = 12;
+  }
+  // ص ≈ صباحًا، م ≈ مساءً
+  final String ap = usePm ? 'م' : 'ص';
+  final String day = _weekdayNameAr(local);
+  return '${h12.toString()}:${minute.toString().padLeft(2, '0')} $ap، $day';
+}
+
 String arabicRelativeSince(DateTime? updated) {
   if (updated == null) {
     return 'لا وقت محدَّث';

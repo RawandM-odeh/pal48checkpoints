@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 
 import '../../models/checkpoint.dart';
 import '../../providers/checkpoint_provider.dart';
-import '../../providers/favorite_checkpoints_provider.dart';
 import '../../providers/saved_checkpoints_provider.dart';
 import '../../providers/user_location_provider.dart';
 import '../../theme/app_colors.dart';
@@ -13,7 +12,6 @@ import '../../utils/ar_relative_time.dart';
 import '../../utils/checkpoint_search.dart';
 import '../../utils/guest_session.dart';
 import '../widgets/checkpoint_card.dart';
-import '../widgets/reference_checkpoint_tile.dart';
 import 'checkpoint_detail_screen.dart';
 
 typedef _NearbyRow = ({Checkpoint checkpoint, double? distanceKm});
@@ -23,20 +21,6 @@ const String _kLocationNotAvailableLabel = 'Location not available';
 
 /// Max checkpoints shown in «أقرب الحواجز» (nearest first after sort).
 const int _kNearestListMaxItems = 20;
-
-Future<void> _toggleFavoriteLoggedInIfAllowed(
-  BuildContext context,
-  FavoriteCheckpointsProvider favorites,
-  String checkpointId,
-) async {
-  if (!await ensureLoggedInForFavorites(context)) {
-    return;
-  }
-  if (!context.mounted) {
-    return;
-  }
-  favorites.toggle(checkpointId);
-}
 
 Future<void> _toggleSavedLoggedInIfAllowed(
   BuildContext context,
@@ -59,8 +43,8 @@ String _formatDistanceAwayKm(double km) {
   return '${km.round()} km away';
 }
 
-/// قائمة عمودية بنفس أسلوب المرجع.
-/// وضع «الأقرب» يُفعّل من شريط الفلاتر في الشاشة الرئيسية؛ الترتيب حسب المسافة (Haversine).
+/// قائمة المستخدم: كل صف حاجزان، وبطاقات بشكل عريض (دخول | خروج).
+/// وضع «الأقرب» يُفعّل من شريط الفلاتر؛ الترتيب حسب المسافة (Haversine).
 class CheckpointList extends StatefulWidget {
   const CheckpointList({
     super.key,
@@ -147,53 +131,127 @@ class _CheckpointListState extends State<CheckpointList> {
     return list;
   }
 
-  List<Widget> _buildBrowseItems(
+  double _userTwinCardOuterHeight({required bool hasCaption}) {
+    if (widget.compactMode) {
+      return hasCaption ? 198.0 : 180.0;
+    }
+    return hasCaption ? 214.0 : 194.0;
+  }
+
+  /// بطاقة بعرض أفضل (عنوان + دخول/خروج جنب بعض) كمرجع الإدارة لكن بلون فاتح.
+  Widget _userCheckpointCard(
     BuildContext context,
-    List<Checkpoint> filtered,
-    FavoriteCheckpointsProvider favorites,
-    SavedCheckpointsProvider saved,
-  ) {
-    final List<Widget> tiles = <Widget>[];
-    for (int i = 0; i < filtered.length; i++) {
-      final Checkpoint c = filtered[i];
-      tiles.add(
-        Padding(
-          padding: EdgeInsets.fromLTRB(
-            AppLayout.pagePaddingH,
-            0,
-            AppLayout.pagePaddingH,
-            widget.compactMode ? 8 : 10,
+    Checkpoint c,
+    SavedCheckpointsProvider saved, {
+    String? captionBelowTitle,
+  }) {
+    final String? trimmed = captionBelowTitle?.trim();
+    final bool hasCaption = trimmed != null && trimmed.isNotEmpty;
+    final double stripH = widget.compactMode
+        ? CheckpointCardStyle.userTwinRowStripHeightCompact
+        : CheckpointCardStyle.userTwinRowStripHeight;
+
+    return SizedBox(
+      height: _userTwinCardOuterHeight(hasCaption: hasCaption),
+      child: CheckpointCard(
+        checkpoint: c,
+        appearance: CheckpointCardAppearance.light,
+        directionStripHeight: stripH,
+        detailCaption: hasCaption ? trimmed : null,
+        trailing: const SizedBox(width: 20),
+        headerEnd: IconButton(
+          tooltip: 'مثبتة',
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(
+            minWidth: 36,
+            minHeight: 28,
           ),
-          child: ReferenceCheckpointTile(
-            checkpoint: c,
-            compact: widget.compactMode,
-            stripColor: checkpointStripColor(c),
-            subtitle: arabicRelativeSince(c.latestDirectionalUpdate),
-            isSaved: saved.isSaved(c.id),
-            onSavedTap: () =>
-                _toggleSavedLoggedInIfAllowed(context, saved, c.id),
-            isFavorite: favorites.isFavorite(c.id),
-            onFavoriteTap: () =>
-                _toggleFavoriteLoggedInIfAllowed(context, favorites, c.id),
-            onDirectionTap: (String direction) {
-              showCheckpointStatusSheet(
-                context: context,
-                checkpoint: c,
-                direction: direction,
-              );
-            },
-            onCardTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => CheckpointDetailScreen(initialCheckpoint: c),
-                ),
-              );
-            },
+          onPressed: () =>
+              _toggleSavedLoggedInIfAllowed(context, saved, c.id),
+          icon: Icon(
+            saved.isSaved(c.id)
+                ? Icons.bookmark_rounded
+                : Icons.bookmark_border_rounded,
+            size: 22,
+            color: saved.isSaved(c.id)
+                ? CheckpointCardStyle.arrowBlue
+                : AppColors.textMutedLight,
           ),
         ),
-      );
-    }
-    return tiles;
+        onStatusBadgeTap: (String direction) {
+          showCheckpointStatusSheet(
+            context: context,
+            checkpoint: c,
+            direction: direction,
+          );
+        },
+        onCardTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => CheckpointDetailScreen(initialCheckpoint: c),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// حاجزان في كل صف؛ [captionFor] اختياري (وضع «الأقرب»: وقت + مسافة تقريبية).
+  Widget _buildTwoColumnRows({
+    required BuildContext context,
+    required List<Checkpoint> checkpoints,
+    required SavedCheckpointsProvider saved,
+    String? Function(Checkpoint c)? captionFor,
+  }) {
+    final double gap = widget.compactMode ? 8 : 10;
+    final int rowCount = (checkpoints.length + 1) >> 1;
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(
+        AppLayout.pagePaddingH,
+        AppLayout.spaceSm,
+        AppLayout.pagePaddingH,
+        AppLayout.spaceSm,
+      ),
+      itemCount: rowCount,
+      itemBuilder: (BuildContext context, int rowIndex) {
+        final int i = rowIndex * 2;
+        final Checkpoint a = checkpoints[i];
+        final Checkpoint? b =
+            i + 1 < checkpoints.length ? checkpoints[i + 1] : null;
+        return Padding(
+          padding: EdgeInsets.only(bottom: rowIndex < rowCount - 1 ? gap : 0),
+          // تجنّب [CrossAxisAlignment.stretch] مع بطاقات بـ [Expanded] داخل عمود ثابت
+          // (مشاكل قياس على الويب مع قائمة فارغة).
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            textDirection: TextDirection.rtl,
+            children: <Widget>[
+              Expanded(
+                child: _userCheckpointCard(
+                  context,
+                  a,
+                  saved,
+                  captionBelowTitle: captionFor?.call(a),
+                ),
+              ),
+              SizedBox(width: gap),
+              Expanded(
+                child: b != null
+                    ? _userCheckpointCard(
+                        context,
+                        b,
+                        saved,
+                        captionBelowTitle: captionFor?.call(b),
+                      )
+                    : const SizedBox.shrink(),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   List<_NearbyRow> _rowsNearUser(
@@ -227,67 +285,11 @@ class _CheckpointListState extends State<CheckpointList> {
     return rows.sublist(0, _kNearestListMaxItems);
   }
 
-  List<Widget> _buildNearestItems(
-    BuildContext context,
-    List<_NearbyRow> rows,
-    FavoriteCheckpointsProvider favorites,
-    SavedCheckpointsProvider saved,
-  ) {
-    final List<Widget> tiles = <Widget>[];
-    for (int i = 0; i < rows.length; i++) {
-      final _NearbyRow row = rows[i];
-      final Checkpoint c = row.checkpoint;
-      final String rel = arabicRelativeSince(c.latestDirectionalUpdate);
-      final String subtitle = row.distanceKm != null
-          ? '$rel · ${_formatDistanceAwayKm(row.distanceKm!)}'
-          : '$rel · $_kLocationNotAvailableLabel';
-      tiles.add(
-        Padding(
-          padding: EdgeInsets.fromLTRB(
-            AppLayout.pagePaddingH,
-            0,
-            AppLayout.pagePaddingH,
-            widget.compactMode ? 8 : 10,
-          ),
-          child: ReferenceCheckpointTile(
-            checkpoint: c,
-            compact: widget.compactMode,
-            stripColor: checkpointStripColor(c),
-            subtitle: subtitle,
-            isSaved: saved.isSaved(c.id),
-            onSavedTap: () =>
-                _toggleSavedLoggedInIfAllowed(context, saved, c.id),
-            isFavorite: favorites.isFavorite(c.id),
-            onFavoriteTap: () =>
-                _toggleFavoriteLoggedInIfAllowed(context, favorites, c.id),
-            onDirectionTap: (String direction) {
-              showCheckpointStatusSheet(
-                context: context,
-                checkpoint: c,
-                direction: direction,
-              );
-            },
-            onCardTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => CheckpointDetailScreen(initialCheckpoint: c),
-                ),
-              );
-            },
-          ),
-        ),
-      );
-    }
-    return tiles;
-  }
-
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final CheckpointProvider provider = context.watch<CheckpointProvider>();
     final UserLocationProvider loc = context.watch<UserLocationProvider>();
-    final FavoriteCheckpointsProvider favorites = context
-        .watch<FavoriteCheckpointsProvider>();
     final SavedCheckpointsProvider saved = context.watch<SavedCheckpointsProvider>();
 
     if (provider.loading && provider.items.isEmpty) {
@@ -336,13 +338,7 @@ class _CheckpointListState extends State<CheckpointList> {
     final List<Checkpoint> citySearchFiltered = _filtered(provider.items);
 
     if (!widget.nearestMode) {
-      final List<Widget> body = _buildBrowseItems(
-        context,
-        citySearchFiltered,
-        favorites,
-        saved,
-      );
-      if (body.isEmpty) {
+      if (citySearchFiltered.isEmpty) {
         return Directionality(
           textDirection: TextDirection.rtl,
           child: ListView(
@@ -367,14 +363,10 @@ class _CheckpointListState extends State<CheckpointList> {
       }
       return Directionality(
         textDirection: TextDirection.rtl,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            0,
-            AppLayout.spaceSm,
-            0,
-            AppLayout.spaceSm,
-          ),
-          children: body,
+        child: _buildTwoColumnRows(
+          context: context,
+          checkpoints: citySearchFiltered,
+          saved: saved,
         ),
       );
     }
@@ -440,19 +432,25 @@ class _CheckpointListState extends State<CheckpointList> {
       );
     }
 
-    final List<Widget> children =
-        _buildNearestItems(context, rows, favorites, saved);
+    final Map<String, String> nearestSubtitleById = <String, String>{};
+    for (final _NearbyRow r in rows) {
+      final Checkpoint c = r.checkpoint;
+      final String rel = arabicRelativeSince(c.latestDirectionalUpdate);
+      nearestSubtitleById[c.id] = r.distanceKm != null
+          ? '$rel · ${_formatDistanceAwayKm(r.distanceKm!)}'
+          : '$rel · $_kLocationNotAvailableLabel';
+    }
+
+    final List<Checkpoint> nearestOrdered =
+        rows.map((_NearbyRow r) => r.checkpoint).toList(growable: false);
 
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(
-          0,
-          AppLayout.spaceSm,
-          0,
-          AppLayout.spaceSm,
-        ),
-        children: children,
+      child: _buildTwoColumnRows(
+        context: context,
+        checkpoints: nearestOrdered,
+        saved: saved,
+        captionFor: (Checkpoint c) => nearestSubtitleById[c.id],
       ),
     );
   }
