@@ -194,22 +194,22 @@ class _CheckpointDetailScreenState extends State<CheckpointDetailScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: _CurrentStatusSummary(
                   checkpoint: c,
-                  onEntranceBadgeTap: () => showCheckpointStatusSheet(
-                    context: context,
-                    checkpoint: c,
-                    direction: 'entrance',
-                    updateSource: widget.bypassProximityCheck
-                        ? CheckpointUpdateSource.admin
-                        : CheckpointUpdateSource.user,
-                  ),
-                  onExitBadgeTap: () => showCheckpointStatusSheet(
-                    context: context,
-                    checkpoint: c,
-                    direction: 'exit',
-                    updateSource: widget.bypassProximityCheck
-                        ? CheckpointUpdateSource.admin
-                        : CheckpointUpdateSource.user,
-                  ),
+                  onEntranceBadgeTap: widget.bypassProximityCheck
+                      ? () => showCheckpointStatusSheet(
+                            context: context,
+                            checkpoint: c,
+                            direction: 'entrance',
+                            updateSource: CheckpointUpdateSource.admin,
+                          )
+                      : null,
+                  onExitBadgeTap: widget.bypassProximityCheck
+                      ? () => showCheckpointStatusSheet(
+                            context: context,
+                            checkpoint: c,
+                            direction: 'exit',
+                            updateSource: CheckpointUpdateSource.admin,
+                          )
+                      : null,
                 ),
               ),
               const SizedBox(height: 14),
@@ -349,13 +349,14 @@ class _RoundIconButton extends StatelessWidget {
 class _CurrentStatusSummary extends StatelessWidget {
   const _CurrentStatusSummary({
     required this.checkpoint,
-    required this.onEntranceBadgeTap,
-    required this.onExitBadgeTap,
+    this.onEntranceBadgeTap,
+    this.onExitBadgeTap,
   });
 
   final Checkpoint checkpoint;
-  final VoidCallback onEntranceBadgeTap;
-  final VoidCallback onExitBadgeTap;
+  /// Null → badge is display-only (normal users); admin passes a tap handler.
+  final VoidCallback? onEntranceBadgeTap;
+  final VoidCallback? onExitBadgeTap;
 
   @override
   Widget build(BuildContext context) {
@@ -421,7 +422,7 @@ class _StatusHalf extends StatelessWidget {
   const _StatusHalf({
     required this.title,
     required this.updatedAt,
-    required this.onBadgeTap,
+    this.onBadgeTap,
     required this.statusWord,
     required this.visual,
     this.sourceFootnote,
@@ -430,7 +431,7 @@ class _StatusHalf extends StatelessWidget {
   final String title;
   final DateTime? updatedAt;
   final String? sourceFootnote;
-  final VoidCallback onBadgeTap;
+  final VoidCallback? onBadgeTap;
   final String statusWord;
   final ({Color bg, Color fg, IconData icon}) visual;
 
@@ -452,12 +453,9 @@ class _StatusHalf extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         Center(
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: onBadgeTap,
-              borderRadius: BorderRadius.circular(14),
-              child: Container(
+          child: Builder(
+            builder: (BuildContext context) {
+              final Widget badge = Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 18,
                   vertical: 10,
@@ -481,8 +479,19 @@ class _StatusHalf extends StatelessWidget {
                     Icon(visual.icon, color: visual.fg, size: 20),
                   ],
                 ),
-              ),
-            ),
+              );
+              if (onBadgeTap == null) {
+                return badge;
+              }
+              return Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: onBadgeTap,
+                  borderRadius: BorderRadius.circular(14),
+                  child: badge,
+                ),
+              );
+            },
           ),
         ),
         const SizedBox(height: 8),

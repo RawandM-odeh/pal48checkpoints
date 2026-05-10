@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/guest_browse_provider.dart';
@@ -19,11 +20,10 @@ import '../../utils/city_display_ar.dart';
 import '../../utils/guest_session.dart';
 import 'checkpoint_list.dart';
 import 'checkpoint_map_screen.dart';
-import 'checkpoint_update_picker_screen.dart';
 import 'saved_checkpoints_screen.dart';
 import 'favorites_screen.dart';
 
-/// هيدر تركوزي + هيكل فاتح ناعم.
+/// هيدر علوي فاتح + هيكل الصفحة الفاتح.
 abstract final class _PalUi {
   static const Color primaryBlue = AppColors.brandTeal;
   static const Color pageBg = AppColors.shellBackground;
@@ -50,27 +50,6 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
 
   /// Anchor for the city popup menu ([showMenu]) near the city chip.
   final GlobalKey _cityMenuAnchorKey = GlobalKey();
-
-  /// شريط التنقل بخمس عُقد؛ [2] = «تحديث حالة حاجز» وليست شاشة.
-  static const int _kRailShareIndex = 2;
-
-  int _screenToRailIndex(int screenIndex) {
-    if (screenIndex < 2) {
-      return screenIndex;
-    }
-    return screenIndex + 1;
-  }
-
-  /// `null` يعني ضغط على زر تحديث حالة الحاجز.
-  int? _screenIndexFromRail(int railIndex) {
-    if (railIndex == _kRailShareIndex) {
-      return null;
-    }
-    if (railIndex < 2) {
-      return railIndex;
-    }
-    return railIndex - 1;
-  }
 
   @override
   void initState() {
@@ -646,27 +625,15 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
                     backgroundColor: Colors.transparent,
                     surfaceTintColor: Colors.transparent,
                     indicatorColor: _PalUi.primaryBlue.withValues(alpha: 0.24),
-                    selectedIndex: _screenToRailIndex(_bottomNavIndex),
+                    selectedIndex: _bottomNavIndex,
                     height: 78,
                     labelBehavior:
                         NavigationDestinationLabelBehavior.alwaysShow,
                     animationDuration: const Duration(milliseconds: 280),
                     onDestinationSelected: (int railIndex) {
-                      final int? nextScreen = _screenIndexFromRail(railIndex);
-                      if (nextScreen == null) {
-                        unawaited(
-                          Navigator.of(context).push<void>(
-                            MaterialPageRoute<void>(
-                              builder: (_) =>
-                                  const CheckpointUpdatePickerScreen(),
-                            ),
-                          ),
-                        );
-                        return;
-                      }
                       final int prev = _bottomNavIndex;
-                      setState(() => _bottomNavIndex = nextScreen);
-                      if (nextScreen == 0 &&
+                      setState(() => _bottomNavIndex = railIndex);
+                      if (railIndex == 0 &&
                           prev != 0 &&
                           mounted &&
                           _nearestListMode) {
@@ -691,11 +658,6 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
                           color: _PalUi.primaryBlue,
                         ),
                         label: 'خريطة',
-                      ),
-                      NavigationDestination(
-                        icon: _ShareNavIcon(selected: false),
-                        selectedIcon: _ShareNavIcon(selected: true),
-                        label: 'تحديث حالة حاجز',
                       ),
                       NavigationDestination(
                         icon: const Icon(
@@ -889,93 +851,123 @@ class _BlueHeader extends StatelessWidget {
   final VoidCallback onMenuPressed;
   final VoidCallback onFavoritesPressed;
 
-  /// أيقونة «المثبتة» البيضاء فقط بجانب المفضلة.
+  /// تمييز أيقونة «المثبتة» عند وجود عناصر محفوظة.
   final bool savedHasBookmarks;
   final VoidCallback onSavedPressed;
 
   @override
   Widget build(BuildContext context) {
     final double top = MediaQuery.paddingOf(context).top;
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: _PalUi.primaryBlue,
-        borderRadius: const BorderRadius.vertical(
-          bottom: Radius.circular(AppLayout.radiusXl),
-        ),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: _PalUi.primaryBlue.withValues(alpha: 0.35),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
+    final Color barTop = Color.lerp(Colors.white, AppColors.brandGlow, 0.35)!;
+    final Color barBottom = Color.lerp(
+      AppColors.shellSurfaceTint,
+      AppColors.shellBackground,
+      0.5,
+    )!;
+    final Color iconColor = AppColors.brandTealDark;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
       ),
-      padding: EdgeInsets.fromLTRB(8, top + 8, 8, 18),
-      child: Stack(
-        alignment: Alignment.center,
-        children: <Widget>[
-          Align(
-            alignment: Alignment.centerRight,
-            child: IconButton(
-              tooltip: 'قائمة',
-              onPressed: onMenuPressed,
-              icon: const Icon(Icons.more_vert, color: Colors.white),
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: <Color>[barTop, barBottom],
+          ),
+          borderRadius: const BorderRadius.vertical(
+            bottom: Radius.circular(AppLayout.radiusXl),
+          ),
+          border: Border(
+            bottom: BorderSide(
+              color: AppColors.brandTeal.withValues(alpha: 0.12),
             ),
           ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              textDirection: TextDirection.ltr,
-              children: <Widget>[
-                IconButton(
-                  tooltip: 'المفضلة',
-                  onPressed: onFavoritesPressed,
-                  visualDensity: VisualDensity.compact,
-                  constraints: const BoxConstraints(
-                    minWidth: 42,
-                    minHeight: 42,
-                  ),
-                  padding: EdgeInsets.zero,
-                  icon: Icon(
-                    Icons.favorite_border_rounded,
-                    color: Colors.white.withValues(alpha: 0.95),
-                    size: 26,
-                  ),
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+              color: AppColors.brandTeal.withValues(alpha: 0.08),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        padding: EdgeInsets.fromLTRB(12, top + 8, 12, 8),
+        child: SizedBox(
+          height: 100,
+          child: Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
+            children: <Widget>[
+              Align(
+                alignment: Alignment.center,
+                child: Image.asset(
+                  'images/app_logo.png',
+                  height: 100,
+                  fit: BoxFit.contain,
+                  alignment: Alignment.center,
                 ),
-                const SizedBox(width: 2),
-                IconButton(
-                  tooltip: 'المثبتة',
-                  onPressed: onSavedPressed,
-                  visualDensity: VisualDensity.compact,
-                  constraints: const BoxConstraints(
-                    minWidth: 42,
-                    minHeight: 42,
+              ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: <Widget>[
+                  IconButton(
+                    tooltip: 'قائمة',
+                    onPressed: onMenuPressed,
+                    icon: Icon(
+                      Icons.more_vert_rounded,
+                      color: iconColor,
+                      size: 26,
+                    ),
                   ),
-                  padding: EdgeInsets.zero,
-                  icon: Icon(
-                    savedHasBookmarks
-                        ? Icons.bookmark_rounded
-                        : Icons.bookmark_border_rounded,
-                    color: Colors.white.withValues(alpha: 0.95),
-                    size: 26,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    textDirection: TextDirection.ltr,
+                    children: <Widget>[
+                      IconButton(
+                        tooltip: 'المفضلة',
+                        onPressed: onFavoritesPressed,
+                        visualDensity: VisualDensity.compact,
+                        constraints: const BoxConstraints(
+                          minWidth: 44,
+                          minHeight: 44,
+                        ),
+                        padding: EdgeInsets.zero,
+                        icon: Icon(
+                          Icons.favorite_border_rounded,
+                          color: iconColor,
+                          size: 26,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      IconButton(
+                        tooltip: 'المثبتة',
+                        onPressed: onSavedPressed,
+                        visualDensity: VisualDensity.compact,
+                        constraints: const BoxConstraints(
+                          minWidth: 44,
+                          minHeight: 44,
+                        ),
+                        padding: EdgeInsets.zero,
+                        icon: Icon(
+                          savedHasBookmarks
+                              ? Icons.bookmark_rounded
+                              : Icons.bookmark_border_rounded,
+                          color: iconColor,
+                          size: 26,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ),
-          Text(
-            'غ وين رايح',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-              fontSize: 22,
-              letterSpacing: 0.5,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -1259,35 +1251,3 @@ class _CityMenuPopupRow extends StatelessWidget {
   }
 }
 
-/// أيقونة زر «تحديث حالة حاجز» داخل [NavigationBar] (بين الخريطة والإشعارات).
-class _ShareNavIcon extends StatelessWidget {
-  const _ShareNavIcon({required this.selected});
-
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: 'تحديث أو مشاركة حالة نقطة تفتيش',
-      button: true,
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: selected
-              ? _PalUi.primaryBlue.withValues(alpha: 0.22)
-              : _PalUi.primaryBlue.withValues(alpha: 0.12),
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: _PalUi.primaryBlue.withValues(alpha: selected ? 0.45 : 0.3),
-          ),
-        ),
-        child: Icon(
-          Icons.edit_note_rounded,
-          size: 23,
-          color: _PalUi.primaryBlue,
-        ),
-      ),
-    );
-  }
-}
