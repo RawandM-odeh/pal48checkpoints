@@ -8,6 +8,7 @@ import '../../providers/notification_provider.dart';
 import '../../providers/user_location_provider.dart';
 import '../../services/auth_service.dart';
 import 'checkpoint_list.dart';
+import 'checkpoint_map_screen.dart';
 
 /// مرجع الواجهة: ثيم داكن، هيدر أزرق، تبويب حواجز/وقود، فلاتر، شريط تنقل سفلي.
 abstract final class _PalUi {
@@ -320,14 +321,7 @@ class _UserScreenState extends State<UserScreen> {
                   key: const ValueKey<String>('plan'),
                   child: _buildSecondaryPane(
                     'تخطيط',
-                    Center(
-                      child: Text(
-                        'الخريطة والتخطيط — قريباً',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: Colors.white54,
-                            ),
-                      ),
-                    ),
+                    const CheckpointMapScreen(),
                   ),
                 ),
               2 => KeyedSubtree(
