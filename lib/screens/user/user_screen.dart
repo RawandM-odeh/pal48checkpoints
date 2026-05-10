@@ -206,9 +206,7 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
       return;
     }
     await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        builder: (_) => const SavedCheckpointsScreen(),
-      ),
+      MaterialPageRoute<void>(builder: (_) => const SavedCheckpointsScreen()),
     );
   }
 
@@ -289,8 +287,8 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
 
   Widget _buildHomeBody(BuildContext context) {
     final CheckpointProvider cp = context.watch<CheckpointProvider>();
-    final SavedCheckpointsProvider saved =
-        context.watch<SavedCheckpointsProvider>();
+    final SavedCheckpointsProvider saved = context
+        .watch<SavedCheckpointsProvider>();
     final Set<String> citySet = <String>{};
     for (final Checkpoint item in cp.items) {
       final String loc = item.location.trim();
@@ -582,29 +580,28 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
                 ),
               ),
               _ => KeyedSubtree(
-                  key: const ValueKey<String>('settings'),
-                  child: _buildSecondaryPane(
-                    'الإعدادات',
-                    ListView(
-                      padding: const EdgeInsets.all(16),
-                      children: <Widget>[
-                        ListTile(
-                          leading: const Icon(Icons.notifications_outlined),
-                          title: const Text('مسح سجل المعاينة'),
-                          subtitle: Text(
-                            inbox.foregroundEntries.isEmpty
-                                ? 'لا توجد عناصر'
-                                : '${inbox.foregroundEntries.length} سطر',
-                          ),
-                          onTap: inbox.foregroundEntries.isEmpty
-                              ? null
-                              : () {
-                                  context.read<NotificationProvider>().clear();
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('تم المسح')),
-                                  );
-                                },
+                key: const ValueKey<String>('settings'),
+                child: _buildSecondaryPane(
+                  'الإعدادات',
+                  ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: <Widget>[
+                      ListTile(
+                        leading: const Icon(Icons.notifications_outlined),
+                        title: const Text('مسح سجل المعاينة'),
+                        subtitle: Text(
+                          inbox.foregroundEntries.isEmpty
+                              ? 'لا توجد عناصر'
+                              : '${inbox.foregroundEntries.length} سطر',
                         ),
+                        onTap: inbox.foregroundEntries.isEmpty
+                            ? null
+                            : () {
+                                context.read<NotificationProvider>().clear();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('تم المسح')),
+                                );
+                              },
                       ),
                       ListTile(
                         leading: const Icon(Icons.logout),
@@ -742,8 +739,9 @@ class _NotificationsBody extends StatelessWidget {
     List<StoredNotification> stored,
     List<ForegroundInboxEntry> foreground,
   ) {
-    final Set<String> storedIds =
-        stored.map((StoredNotification s) => s.id).toSet();
+    final Set<String> storedIds = stored
+        .map((StoredNotification s) => s.id)
+        .toSet();
     final List<_MergedInboxRow> merged = <_MergedInboxRow>[];
 
     for (final ForegroundInboxEntry fg in foreground) {
@@ -774,113 +772,105 @@ class _NotificationsBody extends StatelessWidget {
 
     return StreamBuilder<List<StoredNotification>>(
       stream: repo.watchStoredNotifications(),
-      builder: (
-        BuildContext context,
-        AsyncSnapshot<List<StoredNotification>> snapshot,
-      ) {
-        if (snapshot.connectionState == ConnectionState.waiting &&
-            !snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snapshot.hasError) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text(
-                'تعذّر تحميل الإشعارات',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-            ),
-          );
-        }
+      builder:
+          (
+            BuildContext context,
+            AsyncSnapshot<List<StoredNotification>> snapshot,
+          ) {
+            if (snapshot.connectionState == ConnectionState.waiting &&
+                !snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (snapshot.hasError) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Text(
+                    'تعذّر تحميل الإشعارات',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              );
+            }
 
-        final List<StoredNotification> stored = snapshot.data ?? <StoredNotification>[];
-        final List<_MergedInboxRow> rows =
-            _merge(stored, inbox.foregroundEntries);
+            final List<StoredNotification> stored =
+                snapshot.data ?? <StoredNotification>[];
+            final List<_MergedInboxRow> rows = _merge(
+              stored,
+              inbox.foregroundEntries,
+            );
 
-        if (rows.isEmpty) {
-          return Center(
-            child: Text(
-              'لا توجد إشعارات بعد',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            if (rows.isEmpty) {
+              return Center(
+                child: Text(
+                  'لا توجد إشعارات بعد',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: AppColors.textMutedLight,
                   ),
-            ),
-          );
-        }
+                ),
+              );
+            }
 
-        return ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemCount: rows.length,
-          separatorBuilder: (_, _) => const Divider(height: 1),
-          itemBuilder: (BuildContext context, int i) {
-            final _MergedInboxRow row = rows[i];
-            final ThemeData theme = Theme.of(context);
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  Text(
-                    row.title.isEmpty ? 'إشعار' : row.title,
-                    textAlign: TextAlign.right,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    row.body,
-                    textAlign: TextAlign.right,
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                  if (row.subtitle != null) ...<Widget>[
-                    const SizedBox(height: 6),
-                    Text(
-                      row.subtitle!,
-                      textAlign: TextAlign.right,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppColors.textMutedLight,
+            return ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: rows.length,
+              separatorBuilder: (_, _) => const Divider(height: 1),
+              itemBuilder: (BuildContext context, int i) {
+                final _MergedInboxRow row = rows[i];
+                final ThemeData theme = Theme.of(context);
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      Text(
+                        row.title.isEmpty ? 'إشعار' : row.title,
+                        textAlign: TextAlign.right,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                  ],
-                ],
-              ),
+                      const SizedBox(height: 4),
+                      Text(
+                        row.body,
+                        textAlign: TextAlign.right,
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                      if (row.subtitle != null) ...<Widget>[
+                        const SizedBox(height: 6),
+                        Text(
+                          row.subtitle!,
+                          textAlign: TextAlign.right,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: AppColors.textMutedLight,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                );
+              },
             );
           },
-        );
-      },
     );
   }
 }
 
 class _MergedInboxRow {
-  _MergedInboxRow._({
-    required this.title,
-    required this.body,
-    this.subtitle,
-  });
+  _MergedInboxRow._({required this.title, required this.body, this.subtitle});
 
   factory _MergedInboxRow.foreground(ForegroundInboxEntry e) {
-    return _MergedInboxRow._(
-      title: e.title,
-      body: e.body,
-      subtitle: 'الآن',
-    );
+    return _MergedInboxRow._(title: e.title, body: e.body, subtitle: 'الآن');
   }
 
   factory _MergedInboxRow.stored(StoredNotification s) {
     final DateTime? t = s.sentAt;
     final String? sub = t != null
         ? '${t.year}/${t.month.toString().padLeft(2, '0')}/${t.day.toString().padLeft(2, '0')} '
-            '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}'
+              '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}'
         : null;
-    return _MergedInboxRow._(
-      title: s.title,
-      body: s.body,
-      subtitle: sub,
-    );
+    return _MergedInboxRow._(title: s.title, body: s.body, subtitle: sub);
   }
 
   final String title;
