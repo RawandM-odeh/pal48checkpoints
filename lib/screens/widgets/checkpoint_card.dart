@@ -22,6 +22,7 @@ class CheckpointCard extends StatelessWidget {
     required this.onStatusBadgeTap,
     this.trailing,
     this.footer,
+    this.onCardTap,
   });
 
   final Checkpoint checkpoint;
@@ -33,9 +34,85 @@ class CheckpointCard extends StatelessWidget {
   /// Optional row below the badges (e.g., admin action buttons).
   final Widget? footer;
 
+  /// Opens detail screen etc.; does not wrap [footer] so delete/actions stay separate.
+  final VoidCallback? onCardTap;
+
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
+    final Widget mainColumn = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        SizedBox(
+          height: 28,
+          child: Stack(
+            alignment: Alignment.center,
+            children: <Widget>[
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                child: trailing ??
+                    const Icon(
+                      Icons.chevron_left_rounded,
+                      color: CheckpointCardStyle.arrowBlue,
+                      size: 26,
+                    ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Text(
+                  checkpoint.name.isEmpty ? 'بدون اسم' : checkpoint.name,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: CheckpointCardStyle.navy,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Divider(height: 16, thickness: 1, color: Colors.grey.shade200),
+        Expanded(
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              textDirection: TextDirection.rtl,
+              children: <Widget>[
+                Expanded(
+                  child: _DirectionColumn(
+                    label: 'الدخول',
+                    status: checkpoint.entranceStatus,
+                    updatedAt: checkpoint.entranceUpdatedAt,
+                    onTap: () => onStatusBadgeTap('entrance'),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: VerticalDivider(
+                    width: 1,
+                    thickness: 1,
+                    color: Colors.grey.shade300,
+                  ),
+                ),
+                Expanded(
+                  child: _DirectionColumn(
+                    label: 'الخروج',
+                    status: checkpoint.exitStatus,
+                    updatedAt: checkpoint.exitUpdatedAt,
+                    onTap: () => onStatusBadgeTap('exit'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+
     return Material(
       color: Colors.white,
       elevation: 3,
@@ -47,73 +124,17 @@ class CheckpointCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            SizedBox(
-              height: 28,
-              child: Stack(
-                alignment: Alignment.center,
-                children: <Widget>[
-                  Positioned(
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    child: trailing ??
-                        const Icon(
-                          Icons.chevron_left_rounded,
-                          color: CheckpointCardStyle.arrowBlue,
-                          size: 26,
-                        ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 32),
-                    child: Text(
-                      checkpoint.name.isEmpty ? 'بدون اسم' : checkpoint.name,
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: CheckpointCardStyle.navy,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Divider(height: 16, thickness: 1, color: Colors.grey.shade200),
-            Expanded(
-              child: IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  textDirection: TextDirection.rtl,
-                  children: <Widget>[
-                    Expanded(
-                      child: _DirectionColumn(
-                        label: 'الدخول',
-                        status: checkpoint.entranceStatus,
-                        updatedAt: checkpoint.entranceUpdatedAt,
-                        onTap: () => onStatusBadgeTap('entrance'),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
-                      child: VerticalDivider(
-                        width: 1,
-                        thickness: 1,
-                        color: Colors.grey.shade300,
-                      ),
-                    ),
-                    Expanded(
-                      child: _DirectionColumn(
-                        label: 'الخروج',
-                        status: checkpoint.exitStatus,
-                        updatedAt: checkpoint.exitUpdatedAt,
-                        onTap: () => onStatusBadgeTap('exit'),
-                      ),
-                    ),
-                  ],
+            if (onCardTap != null)
+              Expanded(
+                child: InkWell(
+                  onTap: onCardTap,
+                  borderRadius:
+                      BorderRadius.circular(CheckpointCardStyle.radius - 2),
+                  child: mainColumn,
                 ),
-              ),
-            ),
+              )
+            else
+              Expanded(child: mainColumn),
             if (footer != null) ...<Widget>[
               const SizedBox(height: 8),
               footer!,
@@ -214,6 +235,7 @@ Future<void> showCheckpointStatusSheet({
   required BuildContext context,
   required Checkpoint checkpoint,
   required String direction,
+  CheckpointUpdateSource updateSource = CheckpointUpdateSource.user,
 }) async {
   final CheckpointProvider provider = context.read<CheckpointProvider>();
   final String title = direction == 'entrance'
@@ -272,6 +294,7 @@ Future<void> showCheckpointStatusSheet({
                               checkpoint,
                               direction,
                               CheckpointStatus.all[i],
+                              updateSource,
                             ),
                           ),
                         ],
@@ -295,10 +318,16 @@ Future<void> _applyStatus(
   Checkpoint checkpoint,
   String direction,
   String status,
+  CheckpointUpdateSource updateSource,
 ) async {
   Navigator.of(sheetContext).pop();
   try {
-    await provider.updateStatus(checkpoint.id, direction, status);
+    await provider.updateStatus(
+      checkpoint.id,
+      direction,
+      status,
+      source: updateSource,
+    );
     if (parentContext.mounted) {
       ScaffoldMessenger.of(parentContext).showSnackBar(
         const SnackBar(content: Text('تم حفظ التحديث')),
