@@ -840,7 +840,7 @@ class _BlueHeader extends StatelessWidget {
             ),
           ),
           Text(
-            'غ وين رايح',
+            'وين رايح',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               color: Colors.white,
