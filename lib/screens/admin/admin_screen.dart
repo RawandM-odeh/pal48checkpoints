@@ -4,7 +4,7 @@ import '../../services/auth_service.dart';
 import 'checkpoints_tab.dart';
 import 'send_notification_tab.dart';
 
-/// ثيم داكن للإدارة يقترب من لوحة المستخدم الرئيسية.
+//dark mode
 abstract final class _AdminTheme {
   static const Color pageBg = Color(0xFF1A1C23);
   static const Color surface = Color(0xFF2C2F38);
@@ -71,7 +71,10 @@ class _AdminScreenState extends State<AdminScreen> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: _AdminTheme.primaryBlue, width: 2),
+          borderSide: const BorderSide(
+            color: _AdminTheme.primaryBlue,
+            width: 2,
+          ),
         ),
       ),
     );
@@ -95,10 +98,7 @@ class _AdminScreenState extends State<AdminScreen> {
               ),
             ],
           ),
-          body: IndexedStack(
-            index: _currentIndex,
-            children: _tabs,
-          ),
+          body: IndexedStack(index: _currentIndex, children: _tabs),
           bottomNavigationBar: BottomNavigationBar(
             currentIndex: _currentIndex,
             onTap: (int i) => setState(() => _currentIndex = i),
@@ -107,7 +107,7 @@ class _AdminScreenState extends State<AdminScreen> {
               BottomNavigationBarItem(
                 icon: Icon(Icons.map_outlined),
                 activeIcon: Icon(Icons.map),
-                label: '🗺️ إدارة الحواجز',
+                label: '⚙️ إدارة الحواجز',
               ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.campaign_outlined),
