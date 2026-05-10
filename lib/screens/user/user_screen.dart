@@ -68,41 +68,10 @@ class _UserScreenState extends State<UserScreen> {
   }
 
   Future<void> _openSearchDialog() async {
-    final TextEditingController ctrl =
-        TextEditingController(text: _searchQuery);
     final String? q = await showDialog<String>(
       context: context,
-      builder: (BuildContext ctx) {
-        return Directionality(
-          textDirection: TextDirection.rtl,
-          child: AlertDialog(
-            backgroundColor: const Color(0xFF2C2F38),
-            title: const Text('بحث عن حاجز'),
-            content: TextField(
-              controller: ctrl,
-              autofocus: true,
-              textAlign: TextAlign.right,
-              decoration: const InputDecoration(
-                hintText: 'اسم الحاجز…',
-                border: OutlineInputBorder(),
-              ),
-              onSubmitted: (String v) => Navigator.of(ctx).pop(v.trim()),
-            ),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(null),
-                child: const Text('إلغاء'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
-                child: const Text('بحث'),
-              ),
-            ],
-          ),
-        );
-      },
+      builder: (_) => const _CheckpointSearchDialog(),
     );
-    ctrl.dispose();
     if (q != null && mounted) {
       setState(() => _searchQuery = q);
     }
@@ -631,6 +600,56 @@ class _FilterStrip extends StatelessWidget {
             label: 'مصغر',
             selected: compactOn,
             onTap: onCompactTap,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CheckpointSearchDialog extends StatefulWidget {
+  const _CheckpointSearchDialog();
+
+  @override
+  State<_CheckpointSearchDialog> createState() =>
+      _CheckpointSearchDialogState();
+}
+
+class _CheckpointSearchDialogState extends State<_CheckpointSearchDialog> {
+  final TextEditingController _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: AlertDialog(
+        backgroundColor: const Color(0xFF2C2F38),
+        title: const Text('بحث عن حاجز'),
+        content: TextField(
+          controller: _controller,
+          autofocus: true,
+          textAlign: TextAlign.right,
+          decoration: const InputDecoration(
+            hintText: 'اسم الحاجز…',
+            border: OutlineInputBorder(),
+          ),
+          onSubmitted: (String v) => Navigator.of(context).pop(v.trim()),
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(null),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.of(context).pop(_controller.text.trim()),
+            child: const Text('بحث'),
           ),
         ],
       ),

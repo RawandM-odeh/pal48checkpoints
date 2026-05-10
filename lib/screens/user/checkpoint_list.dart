@@ -7,11 +7,8 @@ import '../../providers/checkpoint_provider.dart';
 import '../../providers/user_location_provider.dart';
 import '../../utils/ar_relative_time.dart';
 import '../widgets/checkpoint_card.dart';
-
-abstract final class _DarkCheckpointUi {
-  static const Color cardBg = Color(0xFF2C2F38);
-  static const Color primaryBlue = Color(0xFF2196F3);
-}
+import '../widgets/reference_checkpoint_tile.dart';
+import 'checkpoint_detail_screen.dart';
 
 typedef _NearbyRow = ({Checkpoint checkpoint, double distanceKm});
 
@@ -47,18 +44,6 @@ class CheckpointList extends StatelessWidget {
       return '${km.toStringAsFixed(1)} كم';
     }
     return '${km.round()} كم';
-  }
-
-  static Color _stripColor(Checkpoint c) {
-    final String e = CheckpointStatus.normalize(c.entranceStatus);
-    final String x = CheckpointStatus.normalize(c.exitStatus);
-    if (e == CheckpointStatus.closed || x == CheckpointStatus.closed) {
-      return const Color(0xFFE53935);
-    }
-    if (e == CheckpointStatus.crowded || x == CheckpointStatus.crowded) {
-      return const Color(0xFFFFA726);
-    }
-    return const Color(0xFF43A047);
   }
 
   static DateTime? _latestUpdate(Checkpoint c) {
@@ -113,16 +98,24 @@ class CheckpointList extends StatelessWidget {
       tiles.add(
         Padding(
           padding: EdgeInsets.fromLTRB(12, 0, 12, compactMode ? 8 : 10),
-          child: _ReferenceCheckpointTile(
+          child: ReferenceCheckpointTile(
             checkpoint: c,
             compact: compactMode,
-            stripColor: _stripColor(c),
+            stripColor: checkpointStripColor(c),
             subtitle: arabicRelativeSince(_latestUpdate(c)),
             onDirectionTap: (String direction) {
               showCheckpointStatusSheet(
                 context: context,
                 checkpoint: c,
                 direction: direction,
+              );
+            },
+            onCardTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) =>
+                      CheckpointDetailScreen(initialCheckpoint: c),
+                ),
               );
             },
           ),
@@ -186,16 +179,24 @@ class CheckpointList extends StatelessWidget {
       tiles.add(
         Padding(
           padding: EdgeInsets.fromLTRB(12, 0, 12, compactMode ? 8 : 10),
-          child: _ReferenceCheckpointTile(
+          child: ReferenceCheckpointTile(
             checkpoint: c,
             compact: compactMode,
-            stripColor: _stripColor(c),
+            stripColor: checkpointStripColor(c),
             subtitle: subtitle,
             onDirectionTap: (String direction) {
               showCheckpointStatusSheet(
                 context: context,
                 checkpoint: c,
                 direction: direction,
+              );
+            },
+            onCardTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) =>
+                      CheckpointDetailScreen(initialCheckpoint: c),
+                ),
               );
             },
           ),
@@ -570,211 +571,6 @@ class _ListModeBar extends StatelessWidget {
   }
 }
 
-class _ReferenceCheckpointTile extends StatelessWidget {
-  const _ReferenceCheckpointTile({
-    required this.checkpoint,
-    required this.compact,
-    required this.stripColor,
-    required this.subtitle,
-    required this.onDirectionTap,
-  });
-
-  final Checkpoint checkpoint;
-  final bool compact;
-  final Color stripColor;
-  final String subtitle;
-  final void Function(String direction) onDirectionTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final double pad = compact ? 10 : 12;
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: Material(
-        color: _DarkCheckpointUi.cardBg,
-        elevation: 2,
-        shadowColor: Colors.black54,
-        child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              textDirection: TextDirection.rtl,
-              children: <Widget>[
-                Container(width: compact ? 4 : 5, color: stripColor),
-                Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(pad + 4, pad, 10, pad),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          checkpoint.name.isEmpty
-                              ? 'بدون اسم'
-                              : checkpoint.name,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: compact ? 15 : 16,
-                                  ),
-                        ),
-                        if (checkpoint.location.trim().isNotEmpty) ...<Widget>[
-                          SizedBox(height: compact ? 2 : 4),
-                          Text(
-                            checkpoint.location.trim(),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
-                                ?.copyWith(
-                                  color: Colors.white38,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                          ),
-                        ],
-                        SizedBox(height: compact ? 4 : 6),
-                        Text(
-                          subtitle,
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Colors.white54,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: EdgeInsets.fromLTRB(8, pad, pad, pad),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: <Widget>[
-                      _InboundOutboundBadge(
-                        label: 'للداخل',
-                        status: checkpoint.entranceStatus,
-                        compact: compact,
-                        onTap: () => onDirectionTap('entrance'),
-                      ),
-                      SizedBox(height: compact ? 6 : 8),
-                      _InboundOutboundBadge(
-                        label: 'للخارج',
-                        status: checkpoint.exitStatus,
-                        compact: compact,
-                        onTap: () => onDirectionTap('exit'),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-      ),
-    );
-  }
-}
-
-class _InboundOutboundBadge extends StatelessWidget {
-  const _InboundOutboundBadge({
-    required this.label,
-    required this.status,
-    required this.compact,
-    required this.onTap,
-  });
-
-  final String label;
-  final String status;
-  final bool compact;
-  final VoidCallback onTap;
-
-  static ({Color bg, Color fg, IconData icon, String text}) _style(
-    String raw,
-  ) {
-    final String s = CheckpointStatus.normalize(raw);
-    if (s == CheckpointStatus.closed) {
-      return (
-        bg: const Color(0xFFC62828),
-        fg: Colors.white,
-        icon: Icons.block_rounded,
-        text: 'مغلق',
-      );
-    }
-    if (s == CheckpointStatus.crowded) {
-      return (
-        bg: const Color(0xFFF9A825),
-        fg: const Color(0xFF3E2723),
-        icon: Icons.groups_rounded,
-        text: 'مزدحم',
-      );
-    }
-    return (
-      bg: const Color(0xFF2E7D32),
-      fg: Colors.white,
-      icon: Icons.check_rounded,
-      text: 'سالك',
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final ({Color bg, Color fg, IconData icon, String text}) styl =
-        _style(status);
-    final double hPad = compact ? 8 : 10;
-    final double vPad = compact ? 6 : 8;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        Text(
-          label,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: Colors.white60,
-                fontWeight: FontWeight.w700,
-              ),
-        ),
-        const SizedBox(height: 4),
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              constraints: const BoxConstraints(minWidth: 104),
-              padding: EdgeInsets.symmetric(
-                horizontal: hPad,
-                vertical: vPad,
-              ),
-              decoration: BoxDecoration(
-                color: styl.bg,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: <Widget>[
-                  Icon(styl.icon, color: styl.fg, size: compact ? 16 : 18),
-                  const SizedBox(width: 6),
-                  Text(
-                    styl.text,
-                    style: TextStyle(
-                      color: styl.fg,
-                      fontWeight: FontWeight.w800,
-                      fontSize: compact ? 12.5 : 13.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _RoadSummaryPromoCard extends StatelessWidget {
   const _RoadSummaryPromoCard({
     required this.onLater,
@@ -792,7 +588,7 @@ class _RoadSummaryPromoCard extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: _DarkCheckpointUi.cardBg,
+          color: ReferenceCheckpointTileTheme.cardBg,
           border: Border.all(color: Colors.white12),
           borderRadius: BorderRadius.circular(16),
         ),
@@ -803,12 +599,13 @@ class _RoadSummaryPromoCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: _DarkCheckpointUi.primaryBlue.withValues(alpha: 0.2),
+                color: ReferenceCheckpointTileTheme.primaryBlue
+                    .withValues(alpha: 0.2),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.groups_2_outlined,
-                color: _DarkCheckpointUi.primaryBlue,
+                color: ReferenceCheckpointTileTheme.primaryBlue,
                 size: 28,
               ),
             ),
@@ -836,7 +633,8 @@ class _RoadSummaryPromoCard extends StatelessWidget {
                     children: <Widget>[
                       FilledButton(
                         style: FilledButton.styleFrom(
-                          backgroundColor: _DarkCheckpointUi.primaryBlue,
+                          backgroundColor:
+                              ReferenceCheckpointTileTheme.primaryBlue,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 18,
