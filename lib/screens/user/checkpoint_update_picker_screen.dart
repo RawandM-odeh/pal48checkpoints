@@ -10,7 +10,6 @@ import '../../theme/app_layout.dart';
 import '../../utils/ar_relative_time.dart';
 import '../../utils/checkpoint_search.dart';
 import '../../utils/guest_session.dart';
-import '../widgets/checkpoint_card.dart';
 import '../widgets/reference_checkpoint_tile.dart';
 import 'checkpoint_detail_screen.dart';
 
@@ -235,13 +234,6 @@ class _CheckpointUpdatePickerScreenState
                                       favorites,
                                       c.id,
                                     ),
-                                  onDirectionTap: (String direction) {
-                                    showCheckpointStatusSheet(
-                                      context: context,
-                                      checkpoint: c,
-                                      direction: direction,
-                                    );
-                                  },
                                   onCardTap: () {
                                     Navigator.of(context).push(
                                       MaterialPageRoute<void>(

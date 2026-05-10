@@ -11,7 +11,6 @@ import '../../theme/app_colors.dart';
 import '../../utils/guest_session.dart';
 import '../../utils/ar_relative_time.dart';
 import '../widgets/reference_checkpoint_tile.dart';
-import '../widgets/checkpoint_card.dart';
 import 'checkpoint_detail_screen.dart';
 
 Future<void> _toggleFavoriteLoggedInIfAllowed(
@@ -249,13 +248,6 @@ class _FavoritesBody extends StatelessWidget {
                   favRead,
                   c.id,
                 ),
-            onDirectionTap: (String direction) {
-              showCheckpointStatusSheet(
-                context: context,
-                checkpoint: c,
-                direction: direction,
-              );
-            },
             onCardTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(

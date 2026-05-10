@@ -10,7 +10,6 @@ import '../../theme/app_colors.dart';
 import '../../theme/app_layout.dart';
 import '../../utils/checkpoint_saved_subtitle_ar.dart';
 import '../../utils/guest_session.dart';
-import '../widgets/checkpoint_card.dart';
 import '../widgets/reference_checkpoint_tile.dart';
 import 'checkpoint_detail_screen.dart';
 
@@ -230,13 +229,6 @@ class _LiveSavedCard extends StatelessWidget {
       onSavedTap: () async => onRemovePinned(),
       isFavorite: false,
       onFavoriteTap: null,
-      onDirectionTap: (String direction) {
-        showCheckpointStatusSheet(
-          context: context,
-          checkpoint: checkpoint,
-          direction: direction,
-        );
-      },
       onCardTap: onOpenDetail,
     );
   }
