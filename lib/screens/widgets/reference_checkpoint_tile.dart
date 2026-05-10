@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../models/checkpoint.dart';
+import '../../theme/app_colors.dart';
 
-/// ألوان البطاقة الداكنة (قائمة المستخدم + بطاقة المرجع).
+/// بطاقة فاتحة ناعمة (قائمة المستخدم + بطاقة المرجع).
 abstract final class ReferenceCheckpointTileTheme {
-  static const Color cardBg = Color(0xFF2C2F38);
-  static const Color primaryBlue = Color(0xFF2196F3);
+  static const Color cardBg = AppColors.cardLight;
+  static const Color primaryBlue = AppColors.brandTeal;
 }
 
 /// شريط جانبي ملوّن حسب أسوأ حالة (دخول/خروج).
@@ -67,7 +68,7 @@ class ReferenceCheckpointTile extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: Colors.white,
+                          color: AppColors.textPrimaryLight,
                           fontWeight: FontWeight.w800,
                           fontSize: compact ? 15 : 16,
                         ),
@@ -79,7 +80,7 @@ class ReferenceCheckpointTile extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.white38,
+                            color: AppColors.textMutedLight,
                             fontWeight: FontWeight.w600,
                           ),
                     ),
@@ -88,7 +89,7 @@ class ReferenceCheckpointTile extends StatelessWidget {
                   Text(
                     subtitle,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.white54,
+                          color: AppColors.textMutedLight,
                           fontWeight: FontWeight.w500,
                         ),
                   ),
@@ -122,19 +123,24 @@ class ReferenceCheckpointTile extends StatelessWidget {
       ),
     );
 
-    return ClipRRect(
+    final RoundedRectangleBorder shape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(16),
-      child: Material(
-        color: ReferenceCheckpointTileTheme.cardBg,
-        elevation: 2,
-        shadowColor: Colors.black54,
-        child: onCardTap == null
-            ? row
-            : InkWell(
-                onTap: onCardTap,
-                child: row,
-              ),
-      ),
+      side: BorderSide(color: AppColors.borderSubtleLight),
+    );
+    return Material(
+      color: ReferenceCheckpointTileTheme.cardBg,
+      elevation: 1.5,
+      shadowColor: AppColors.brandTeal.withValues(alpha: 0.12),
+      surfaceTintColor: Colors.transparent,
+      shape: shape,
+      clipBehavior: Clip.antiAlias,
+      child: onCardTap == null
+          ? row
+          : InkWell(
+              onTap: onCardTap,
+              borderRadius: BorderRadius.circular(16),
+              child: row,
+            ),
     );
   }
 }
@@ -209,7 +215,7 @@ class _InboundOutboundBadge extends StatelessWidget {
         Text(
           label,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: Colors.white60,
+                color: AppColors.textMutedLight,
                 fontWeight: FontWeight.w700,
               ),
         ),

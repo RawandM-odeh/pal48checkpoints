@@ -2,19 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../config/nearby_config.dart';
+import '../../providers/guest_browse_provider.dart';
 import '../../models/checkpoint.dart';
 import '../../providers/checkpoint_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/user_location_provider.dart';
 import '../../services/auth_service.dart';
+import '../../theme/app_colors.dart';
 import 'checkpoint_list.dart';
 import 'checkpoint_map_screen.dart';
 
-/// مرجع الواجهة: ثيم داكن، هيدر أزرق، تبويب حواجز/وقود، فلاتر، شريط تنقل سفلي.
+/// هيدر تركوزي + هيكل فاتح ناعم.
 abstract final class _PalUi {
-  static const Color primaryBlue = Color(0xFF2196F3);
-  static const Color pageBg = Color(0xFF1A1C23);
-  static const Color segmentInactiveBg = Color(0xFF12141A);
+  static const Color primaryBlue = AppColors.brandTeal;
+  static const Color pageBg = AppColors.shellBackground;
+  static const Color segmentInactiveBg = AppColors.shellSegmentTrack;
 }
 
 class UserScreen extends StatefulWidget {
@@ -35,23 +37,25 @@ class _UserScreenState extends State<UserScreen> {
   String? _cityFilter;
   bool _promoVisible = true;
 
-  ThemeData _darkUserTheme(BuildContext base) {
+  ThemeData _lightUserTheme(BuildContext base) {
     final ColorScheme scheme = ColorScheme.fromSeed(
       seedColor: _PalUi.primaryBlue,
-      brightness: Brightness.dark,
-      surface: const Color(0xFF2C2F38),
+      brightness: Brightness.light,
+      surface: AppColors.cardLight,
     );
     return ThemeData(
       useMaterial3: true,
-      brightness: Brightness.dark,
+      brightness: Brightness.light,
       scaffoldBackgroundColor: _PalUi.pageBg,
       colorScheme: scheme.copyWith(
-        surface: const Color(0xFF2C2F38),
+        surface: AppColors.cardLight,
+        onSurface: AppColors.textPrimaryLight,
         primary: _PalUi.primaryBlue,
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: _PalUi.pageBg,
-        indicatorColor: _PalUi.primaryBlue.withValues(alpha: 0.35),
+        backgroundColor: AppColors.cardLight,
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: _PalUi.primaryBlue.withValues(alpha: 0.18),
         labelTextStyle: WidgetStateProperty.resolveWith((Set<WidgetState> s) {
           final TextStyle baseStyle =
               Theme.of(base).textTheme.labelMedium ?? const TextStyle();
@@ -61,7 +65,7 @@ class _UserScreenState extends State<UserScreen> {
               fontWeight: FontWeight.w700,
             );
           }
-          return baseStyle.copyWith(color: Colors.white70);
+          return baseStyle.copyWith(color: AppColors.textMutedLight);
         }),
       ),
     );
@@ -80,7 +84,7 @@ class _UserScreenState extends State<UserScreen> {
   void _showCityPicker(List<String> cities) {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF2C2F38),
+      backgroundColor: AppColors.cardLight,
       showDragHandle: true,
       builder: (BuildContext bc) {
         return Directionality(
@@ -137,7 +141,7 @@ class _UserScreenState extends State<UserScreen> {
           onMenuPressed: () async {
             await showModalBottomSheet<void>(
               context: context,
-              backgroundColor: const Color(0xFF2C2F38),
+              backgroundColor: AppColors.cardLight,
               showDragHandle: true,
               builder: (BuildContext bc) {
                 return Directionality(
@@ -152,6 +156,11 @@ class _UserScreenState extends State<UserScreen> {
                           onTap: () async {
                             Navigator.pop(bc);
                             await AuthService().signOut();
+                            if (context.mounted) {
+                              await context
+                                  .read<GuestBrowseProvider>()
+                                  .exitGuestBrowse();
+                            }
                           },
                         ),
                       ],
@@ -225,7 +234,7 @@ class _UserScreenState extends State<UserScreen> {
                       'محطات الوقود — قريباً',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: Colors.white54,
+                            color: AppColors.textMutedLight,
                           ),
                     ),
                   ),
@@ -259,7 +268,7 @@ class _UserScreenState extends State<UserScreen> {
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w800,
-                  color: Colors.white,
+                  color: AppColors.textPrimaryLight,
                 ),
           ),
         ),
@@ -274,7 +283,7 @@ class _UserScreenState extends State<UserScreen> {
         context.watch<NotificationProvider>();
 
     return Theme(
-      data: _darkUserTheme(context),
+      data: _lightUserTheme(context),
       child: Directionality(
         textDirection: TextDirection.rtl,
         child: Scaffold(
@@ -327,7 +336,14 @@ class _UserScreenState extends State<UserScreen> {
                         ListTile(
                           leading: const Icon(Icons.logout),
                           title: const Text('تسجيل الخروج'),
-                          onTap: () => AuthService().signOut(),
+                          onTap: () async {
+                            await AuthService().signOut();
+                            if (context.mounted) {
+                              await context
+                                  .read<GuestBrowseProvider>()
+                                  .exitGuestBrowse();
+                            }
+                          },
                         ),
                       ],
                     ),
@@ -385,7 +401,7 @@ class _NotificationsBody extends StatelessWidget {
         child: Text(
           'لا توجد إشعارات بعد',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: Colors.white54,
+                color: AppColors.textMutedLight,
               ),
         ),
       );
@@ -466,7 +482,7 @@ class _MainSegmentSwitch extends StatelessWidget {
       decoration: BoxDecoration(
         color: _PalUi.segmentInactiveBg,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white24),
+        border: Border.all(color: AppColors.borderSubtleLight),
       ),
       child: Row(
         children: <Widget>[
@@ -509,7 +525,7 @@ class _SegmentTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected ? Colors.white : Colors.transparent,
+      color: selected ? AppColors.cardLight : Colors.transparent,
       borderRadius: BorderRadius.circular(11),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -522,7 +538,9 @@ class _SegmentTile extends StatelessWidget {
               Icon(
                 icon,
                 size: 20,
-                color: selected ? Colors.black87 : Colors.white70,
+                color: selected
+                    ? _PalUi.primaryBlue
+                    : AppColors.textMutedLight,
               ),
               const SizedBox(width: 6),
               Flexible(
@@ -534,7 +552,9 @@ class _SegmentTile extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,
-                    color: selected ? Colors.black87 : Colors.white70,
+                    color: selected
+                        ? AppColors.textPrimaryLight
+                        : AppColors.textMutedLight,
                   ),
                 ),
               ),
@@ -629,7 +649,7 @@ class _CheckpointSearchDialogState extends State<_CheckpointSearchDialog> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: AlertDialog(
-        backgroundColor: const Color(0xFF2C2F38),
+        backgroundColor: AppColors.cardLight,
         title: const Text('بحث عن حاجز'),
         content: TextField(
           controller: _controller,
@@ -684,17 +704,27 @@ class _FilterChipButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: Colors.white24),
+            border: Border.all(
+              color: selected
+                  ? _PalUi.primaryBlue.withValues(alpha: 0.35)
+                  : AppColors.borderSubtleLight,
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Icon(icon, size: 18, color: Colors.white),
+              Icon(
+                icon,
+                size: 18,
+                color: selected ? _PalUi.primaryBlue : AppColors.textMutedLight,
+              ),
               const SizedBox(width: 6),
               Text(
                 label,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: selected
+                      ? AppColors.textPrimaryLight
+                      : AppColors.textMutedLight,
                   fontWeight: FontWeight.w600,
                   fontSize: 13,
                 ),
@@ -727,14 +757,16 @@ class _ShareUpdatesBar extends StatelessWidget {
             'خليك قريب من تحديثاتنا عبر صفحاتنا',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white60,
+                  color: AppColors.textMutedLight,
                 ),
           ),
           const SizedBox(height: 10),
           Row(
             children: <Widget>[
               Material(
-                color: _PalUi.pageBg,
+                color: AppColors.cardLight,
+                elevation: 1,
+                shadowColor: Colors.black.withValues(alpha: 0.06),
                 shape: const CircleBorder(),
                 clipBehavior: Clip.antiAlias,
                 child: InkWell(

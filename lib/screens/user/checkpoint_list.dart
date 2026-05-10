@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../models/checkpoint.dart';
 import '../../providers/checkpoint_provider.dart';
 import '../../providers/user_location_provider.dart';
+import '../../theme/app_colors.dart';
 import '../../utils/ar_relative_time.dart';
 import '../widgets/checkpoint_card.dart';
 import '../widgets/reference_checkpoint_tile.dart';
@@ -259,7 +260,7 @@ class CheckpointList extends StatelessWidget {
               child: Text(
                 'لا توجد حواجز في الخادم',
                 style: theme.textTheme.titleMedium?.copyWith(
-                  color: Colors.white54,
+                  color: AppColors.textMutedLight,
                 ),
               ),
             ),
@@ -290,7 +291,7 @@ class CheckpointList extends StatelessWidget {
                 child: Text(
                   'لا توجد نقاط تطابق الفلتر أو البحث',
                   style: theme.textTheme.titleMedium?.copyWith(
-                    color: Colors.white54,
+                    color: AppColors.textMutedLight,
                   ),
                 ),
               ),
@@ -338,7 +339,7 @@ class CheckpointList extends StatelessWidget {
               'جاري تحديد موقعك لترتيب الحواجز حسب القرب…',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyLarge?.copyWith(
-                color: Colors.white70,
+                color: AppColors.textMutedLight,
               ),
             ),
           ],
@@ -369,7 +370,7 @@ class CheckpointList extends StatelessWidget {
               loc.errorMessageAr!,
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyLarge?.copyWith(
-                color: Colors.white70,
+                color: AppColors.textMutedLight,
               ),
             ),
             const SizedBox(height: 16),
@@ -406,7 +407,7 @@ class CheckpointList extends StatelessWidget {
               child: Text(
                 'لم يُحدَّد الموقع',
                 style: theme.textTheme.titleMedium?.copyWith(
-                  color: Colors.white54,
+                  color: AppColors.textMutedLight,
                 ),
               ),
             ),
@@ -442,7 +443,7 @@ class CheckpointList extends StatelessWidget {
               'أضف latitude و longitude أو geo لكل حاجز.',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyLarge?.copyWith(
-                color: Colors.white60,
+                color: AppColors.textMutedLight,
               ),
             ),
             const SizedBox(height: 12),
@@ -480,7 +481,7 @@ class CheckpointList extends StatelessWidget {
                   : 'لا توجد نقاط ضمن النطاق.',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyLarge?.copyWith(
-                color: Colors.white60,
+                color: AppColors.textMutedLight,
               ),
             ),
             const SizedBox(height: 12),
@@ -589,7 +590,7 @@ class _RoadSummaryPromoCard extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: ReferenceCheckpointTileTheme.cardBg,
-          border: Border.all(color: Colors.white12),
+          border: Border.all(color: AppColors.borderSubtleLight),
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
@@ -617,7 +618,7 @@ class _RoadSummaryPromoCard extends StatelessWidget {
                   Text(
                     'اشعارات بملخص الطريق',
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: Colors.white,
+                          color: AppColors.textPrimaryLight,
                           fontWeight: FontWeight.w800,
                         ),
                   ),
@@ -625,7 +626,7 @@ class _RoadSummaryPromoCard extends StatelessWidget {
                   Text(
                     'في الوقت المناسب لك!',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.white60,
+                          color: AppColors.textMutedLight,
                         ),
                   ),
                   const SizedBox(height: 12),
