@@ -774,7 +774,7 @@ class _TimelineCard extends StatelessWidget {
               entry.footNote!,
               textAlign: TextAlign.right,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: _successGreen,
+                color: Colors.white54,
                 fontWeight: FontWeight.w600,
               ),
             ),
