@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../models/checkpoint.dart';
 import '../../providers/checkpoint_provider.dart';
 import '../../providers/favorite_checkpoints_provider.dart';
+import '../../providers/saved_checkpoints_provider.dart';
 import '../../theme/app_colors.dart';
 import '../../utils/guest_session.dart';
 import '../../utils/ar_relative_time.dart';
@@ -27,13 +28,18 @@ Future<void> _toggleFavoriteLoggedInIfAllowed(
   favorites.toggle(checkpointId);
 }
 
-DateTime? _favoriteLatestUpdate(Checkpoint c) {
-  final DateTime? a = c.entranceUpdatedAt;
-  final DateTime? b = c.exitUpdatedAt;
-  if (a != null && b != null) {
-    return a.isAfter(b) ? a : b;
+Future<void> _toggleSavedLoggedInIfAllowed(
+  BuildContext context,
+  SavedCheckpointsProvider saved,
+  String checkpointId,
+) async {
+  if (!await ensureLoggedInForSaved(context)) {
+    return;
   }
-  return a ?? b;
+  if (!context.mounted) {
+    return;
+  }
+  saved.toggle(checkpointId);
 }
 
 class FavoritesScreen extends StatelessWidget {
@@ -43,6 +49,7 @@ class FavoritesScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final FavoriteCheckpointsProvider favorites = context
         .watch<FavoriteCheckpointsProvider>();
+    final SavedCheckpointsProvider saved = context.watch<SavedCheckpointsProvider>();
     final CheckpointProvider cp = context.watch<CheckpointProvider>();
 
     return Directionality(
@@ -77,16 +84,25 @@ class FavoritesScreen extends StatelessWidget {
           ),
           centerTitle: true,
         ),
-        body: _FavoritesBody(favorites: favorites, checkpoints: cp),
+        body: _FavoritesBody(
+          favorites: favorites,
+          saved: saved,
+          checkpoints: cp,
+        ),
       ),
     );
   }
 }
 
 class _FavoritesBody extends StatelessWidget {
-  const _FavoritesBody({required this.favorites, required this.checkpoints});
+  const _FavoritesBody({
+    required this.favorites,
+    required this.saved,
+    required this.checkpoints,
+  });
 
   final FavoriteCheckpointsProvider favorites;
+  final SavedCheckpointsProvider saved;
   final CheckpointProvider checkpoints;
 
   @override
@@ -215,15 +231,18 @@ class _FavoritesBody extends StatelessWidget {
           );
         }
 
-        final String subtitle = arabicRelativeSince(_favoriteLatestUpdate(c));
+        final String subtitle = arabicRelativeSince(c.latestDirectionalUpdate);
 
         return Padding(
           padding: const EdgeInsets.only(bottom: 10),
-          child: ReferenceCheckpointTile(
+            child: ReferenceCheckpointTile(
             checkpoint: c,
             compact: false,
             stripColor: checkpointStripColor(c),
             subtitle: subtitle,
+            isSaved: saved.isSaved(c.id),
+            onSavedTap: () =>
+                _toggleSavedLoggedInIfAllowed(context, saved, c.id),
             isFavorite: true,
             onFavoriteTap: () => _toggleFavoriteLoggedInIfAllowed(
                   context,

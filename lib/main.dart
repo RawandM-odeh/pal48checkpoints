@@ -11,6 +11,7 @@ import 'firebase_options.dart';
 import 'providers/checkpoint_provider.dart';
 import 'providers/favorite_checkpoints_provider.dart';
 import 'providers/guest_browse_provider.dart';
+import 'providers/saved_checkpoints_provider.dart';
 import 'providers/notification_provider.dart';
 import 'providers/user_location_provider.dart';
 import 'repositories/checkpoint_repository.dart';
@@ -58,6 +59,10 @@ Future<void> main() async {
         ),
         ChangeNotifierProvider<FavoriteCheckpointsProvider>(
           create: (_) => FavoriteCheckpointsProvider(prefs, FirestoreService()),
+        ),
+        ChangeNotifierProvider<SavedCheckpointsProvider>(
+          create: (_) =>
+              SavedCheckpointsProvider(FirestoreService()),
         ),
       ],
       child: const CheckpointAppRoot(),

@@ -5,6 +5,7 @@ import '../../models/checkpoint.dart';
 import '../../providers/checkpoint_provider.dart';
 import '../../repositories/checkpoint_repository.dart';
 import '../user/checkpoint_detail_screen.dart';
+import '../../utils/city_display_ar.dart';
 import '../widgets/checkpoint_card.dart';
 
 /// مدن فريدة من حقل موقع الحواجز الحالية — للفلترة ولإضافة حاجز جديد.
@@ -461,7 +462,7 @@ class _AddCheckpointDialogState extends State<_AddCheckpointDialog> {
                                 (String city) => DropdownMenuItem<String>(
                                   value: city,
                                   child: Text(
-                                    city,
+                                    cityDisplayNameAr(city),
                                     textAlign: TextAlign.right,
                                     overflow: TextOverflow.ellipsis,
                                   ),

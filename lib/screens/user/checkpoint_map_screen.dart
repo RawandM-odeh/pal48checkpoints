@@ -9,8 +9,10 @@ import 'package:latlong2/latlong.dart';
 import '../../models/checkpoint.dart';
 import '../../providers/checkpoint_provider.dart';
 import '../../providers/favorite_checkpoints_provider.dart';
+import '../../providers/saved_checkpoints_provider.dart';
 import '../../theme/app_colors.dart';
 import '../../utils/ar_relative_time.dart';
+import '../../utils/city_display_ar.dart';
 import '../../utils/guest_session.dart';
 import '../widgets/checkpoint_card.dart';
 import '../widgets/split_checkpoint_pin.dart';
@@ -150,7 +152,9 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
         final List<MapEntry<String, String>> entries =
             catalog.entries.toList(growable: false)..sort(
               (MapEntry<String, String> a, MapEntry<String, String> b) =>
-                  a.value.compareTo(b.value),
+                  cityDisplayNameAr(
+                    a.value,
+                  ).compareTo(cityDisplayNameAr(b.value)),
             );
         final double maxH = MediaQuery.sizeOf(bc).height * 0.62;
         return Directionality(
@@ -226,7 +230,9 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
                                   },
                                   activeColor: AppColors.brandTeal,
                                   title: Text(
-                                    e.value,
+                                    e.key == '__NONE__'
+                                        ? e.value
+                                        : cityDisplayNameAr(e.value),
                                     style: const TextStyle(
                                       color: AppColors.textPrimaryLight,
                                     ),
@@ -289,6 +295,20 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
     fv.toggle(checkpoint.id);
   }
 
+  Future<void> _toggleMapCheckpointSaved(
+    BuildContext hostContext,
+    SavedCheckpointsProvider sv,
+    Checkpoint checkpoint,
+  ) async {
+    if (!await ensureLoggedInForSaved(hostContext)) {
+      return;
+    }
+    if (!hostContext.mounted) {
+      return;
+    }
+    sv.toggle(checkpoint.id);
+  }
+
   Future<void> _showCheckpointSheet(BuildContext context, Checkpoint c) async {
     await showModalBottomSheet<void>(
       context: context,
@@ -304,8 +324,14 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
               20,
               16 + MediaQuery.paddingOf(bc).bottom,
             ),
-            child: Consumer<FavoriteCheckpointsProvider>(
-              builder: (_, FavoriteCheckpointsProvider fv, Widget? _) {
+            child: Consumer2<FavoriteCheckpointsProvider,
+                SavedCheckpointsProvider>(
+              builder: (
+                BuildContext _,
+                FavoriteCheckpointsProvider fv,
+                SavedCheckpointsProvider sv,
+                Widget? child,
+              ) {
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -333,9 +359,23 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
                             c.name.isEmpty ? 'بدون اسم' : c.name,
                             textAlign: TextAlign.center,
                             style: Theme.of(bc).textTheme.titleLarge?.copyWith(
-                              color: AppColors.textPrimaryLight,
-                              fontWeight: FontWeight.w800,
-                            ),
+                                  color: AppColors.textPrimaryLight,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'مثبتة',
+                          onPressed: () => unawaited(
+                            _toggleMapCheckpointSaved(context, sv, c),
+                          ),
+                          icon: Icon(
+                            sv.isSaved(c.id)
+                                ? Icons.bookmark
+                                : Icons.bookmark_border_rounded,
+                            color: sv.isSaved(c.id)
+                                ? AppColors.brandTeal
+                                : AppColors.textMutedLight,
                           ),
                         ),
                       ],
@@ -343,7 +383,7 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
                     if (c.location.trim().isNotEmpty) ...<Widget>[
                       const SizedBox(height: 6),
                       Text(
-                        c.location.trim(),
+                        cityDisplayNameAr(c.location),
                         textAlign: TextAlign.center,
                         style: Theme.of(bc).textTheme.bodyMedium?.copyWith(
                           color: AppColors.textMutedLight,

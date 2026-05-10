@@ -78,4 +78,31 @@ class FirestoreService {
       'favoriteCheckpointIds': sorted,
     }, SetOptions(merge: true));
   }
+
+  /// حواجز «المثبتة» المحفوظة في حساب المستخدم (`savedCheckpointIds`).
+  Future<Set<String>> getSavedCheckpointIds(String uid) async {
+    final DocumentSnapshot<Map<String, dynamic>> doc = await _db
+        .collection('users')
+        .doc(uid)
+        .get();
+    if (!doc.exists) {
+      return <String>{};
+    }
+    final Object? raw = doc.data()?['savedCheckpointIds'];
+    if (raw is List) {
+      return raw
+          .whereType<String>()
+          .map((String s) => s.trim())
+          .where((String s) => s.isNotEmpty)
+          .toSet();
+    }
+    return <String>{};
+  }
+
+  Future<void> setSavedCheckpointIds(String uid, Set<String> ids) async {
+    final List<String> sorted = ids.toList()..sort();
+    await _db.collection('users').doc(uid).set(<String, Object?>{
+      'savedCheckpointIds': sorted,
+    }, SetOptions(merge: true));
+  }
 }

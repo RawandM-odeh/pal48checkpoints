@@ -66,3 +66,54 @@ Future<bool> ensureLoggedInForFavorites(BuildContext context) async {
   await showLoginRequiredDialog(context);
   return false;
 }
+
+/// حوار العربية لصفحة المثبتة والعلامة على البطاقات.
+Future<void> showSavedLoginRequiredDialog(BuildContext context) async {
+  await showDialog<void>(
+    context: context,
+    builder: (BuildContext ctx) {
+      return Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Text(
+            'تسجيل الدخول مطلوب',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontWeight: FontWeight.w800),
+          ),
+          content: const Text(
+            'يرجى تسجيل الدخول لحفظ الحواجز ومتابعتها.',
+            textAlign: TextAlign.center,
+          ),
+          actionsAlignment: MainAxisAlignment.spaceBetween,
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('إلغاء'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                Navigator.of(ctx).pop();
+                await FirebaseAuth.instance.signOut();
+                if (context.mounted) {
+                  await context.read<GuestBrowseProvider>().exitGuestBrowse();
+                }
+              },
+              child: const Text('تسجيل الدخول'),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+Future<bool> ensureLoggedInForSaved(BuildContext context) async {
+  if (canUserMakeCheckpointWrites) {
+    return true;
+  }
+  await showSavedLoginRequiredDialog(context);
+  return false;
+}

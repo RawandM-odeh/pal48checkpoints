@@ -170,6 +170,16 @@ class Checkpoint {
       latitude!.isFinite &&
       longitude!.isFinite;
 
+  /// أحدث وقت تحديث بين الدخول والخروج (بطاقات القائمة والمفضلة).
+  DateTime? get latestDirectionalUpdate {
+    final DateTime? a = entranceUpdatedAt;
+    final DateTime? b = exitUpdatedAt;
+    if (a != null && b != null) {
+      return a.isAfter(b) ? a : b;
+    }
+    return a ?? b;
+  }
+
   /// تحديث من التطبيق (وليس تليغرام أو مصدر خارجي آخر).
   static bool isInAppUpdateSource(String? source) {
     if (source == null) {

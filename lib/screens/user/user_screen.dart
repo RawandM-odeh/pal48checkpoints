@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -6,13 +7,18 @@ import 'package:provider/provider.dart';
 import '../../providers/guest_browse_provider.dart';
 import '../../models/checkpoint.dart';
 import '../../providers/checkpoint_provider.dart';
+import '../../providers/saved_checkpoints_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/user_location_provider.dart';
 import '../../services/auth_service.dart';
 import '../../theme/app_colors.dart';
+import '../../theme/app_layout.dart';
+import '../../utils/city_display_ar.dart';
 import '../../utils/guest_session.dart';
 import 'checkpoint_list.dart';
 import 'checkpoint_map_screen.dart';
+import 'checkpoint_update_picker_screen.dart';
+import 'saved_checkpoints_screen.dart';
 import 'favorites_screen.dart';
 
 /// هيدر تركوزي + هيكل فاتح ناعم.
@@ -35,12 +41,34 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
   bool _compactCards = false;
-  bool _pinnedFilter = false;
 
   /// عرض «أقرب الحواجز» يعتمد على GPS؛ الافتراضي عرض كل الحواجز حسب المدينة.
   bool _nearestListMode = false;
   String? _cityFilter;
-  bool _promoVisible = true;
+
+  /// Anchor for the city popup menu ([showMenu]) near the city chip.
+  final GlobalKey _cityMenuAnchorKey = GlobalKey();
+
+  /// شريط التنقل بخمس عُقد؛ [2] = «تحديث حالة حاجز» وليست شاشة.
+  static const int _kRailShareIndex = 2;
+
+  int _screenToRailIndex(int screenIndex) {
+    if (screenIndex < 2) {
+      return screenIndex;
+    }
+    return screenIndex + 1;
+  }
+
+  /// `null` يعني ضغط على زر تحديث حالة الحاجز.
+  int? _screenIndexFromRail(int railIndex) {
+    if (railIndex == _kRailShareIndex) {
+      return null;
+    }
+    if (railIndex < 2) {
+      return railIndex;
+    }
+    return railIndex - 1;
+  }
 
   @override
   void initState() {
@@ -69,6 +97,7 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
       brightness: Brightness.light,
       surface: AppColors.cardLight,
     );
+    final TextTheme baseText = Theme.of(base).textTheme;
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
@@ -77,22 +106,79 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
         surface: AppColors.cardLight,
         onSurface: AppColors.textPrimaryLight,
         primary: _PalUi.primaryBlue,
+        onPrimary: Colors.white,
+        outline: AppColors.borderSubtleLight,
+      ),
+      textTheme: baseText.copyWith(
+        titleLarge: baseText.titleLarge?.copyWith(
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.35,
+          color: AppColors.textPrimaryLight,
+        ),
+        titleMedium: baseText.titleMedium?.copyWith(
+          fontWeight: FontWeight.w700,
+          color: AppColors.textPrimaryLight,
+        ),
+        bodyLarge: baseText.bodyLarge?.copyWith(
+          color: AppColors.textPrimaryLight,
+          height: 1.4,
+        ),
+        bodyMedium: baseText.bodyMedium?.copyWith(
+          height: 1.4,
+          color: AppColors.textPrimaryLight,
+        ),
+        labelLarge: baseText.labelLarge?.copyWith(
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.2,
+        ),
+      ),
+      cardTheme: CardThemeData(
+        elevation: AppLayout.cardElevation,
+        shadowColor: const Color(0xFF0F172A).withValues(alpha: 0.08),
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppLayout.radiusLg),
+          side: const BorderSide(color: AppColors.borderSubtleLight),
+        ),
+        color: AppColors.cardLight,
+        clipBehavior: Clip.antiAlias,
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: AppColors.cardLight,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        height: 70,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         surfaceTintColor: Colors.transparent,
-        indicatorColor: _PalUi.primaryBlue.withValues(alpha: 0.18),
+        indicatorColor: _PalUi.primaryBlue.withValues(alpha: 0.22),
+        iconTheme: WidgetStateProperty.resolveWith((Set<WidgetState> s) {
+          if (s.contains(WidgetState.selected)) {
+            return IconThemeData(color: _PalUi.primaryBlue, size: 26);
+          }
+          return IconThemeData(color: AppColors.textMutedLight, size: 24);
+        }),
         labelTextStyle: WidgetStateProperty.resolveWith((Set<WidgetState> s) {
-          final TextStyle baseStyle =
+          final TextStyle style =
               Theme.of(base).textTheme.labelMedium ?? const TextStyle();
           if (s.contains(WidgetState.selected)) {
-            return baseStyle.copyWith(
+            return style.copyWith(
               color: _PalUi.primaryBlue,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
+              fontSize: 12.5,
+              height: 1.2,
+              letterSpacing: -0.1,
             );
           }
-          return baseStyle.copyWith(color: AppColors.textMutedLight);
+          return style.copyWith(
+            color: AppColors.textMutedLight,
+            fontWeight: FontWeight.w600,
+            fontSize: 12,
+            height: 1.22,
+            letterSpacing: -0.05,
+          );
         }),
+        indicatorShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppLayout.radiusMd),
+        ),
       ),
     );
   }
@@ -104,8 +190,23 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
     if (!mounted) {
       return;
     }
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const FavoritesScreen()),
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const FavoritesScreen()));
+  }
+
+  Future<void> _openSavedCheckpointsScreen() async {
+    if (!canUserMakeCheckpointWrites) {
+      await showSavedLoginRequiredDialog(context);
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => const SavedCheckpointsScreen(),
+      ),
     );
   }
 
@@ -114,50 +215,80 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
     setState(() => _searchQuery = '');
   }
 
-  void _showCityPicker(List<String> cities) {
-    showModalBottomSheet<void>(
+  /// Compact popup menu next to the city chip (not a full-screen bottom sheet).
+  Future<void> _openCityMenu(List<String> cities) async {
+    final BuildContext? anchorContext = _cityMenuAnchorKey.currentContext;
+    if (anchorContext == null) {
+      return;
+    }
+    final RenderBox button = anchorContext.findRenderObject()! as RenderBox;
+    final OverlayState overlayState = Overlay.of(anchorContext);
+    final RenderBox overlay =
+        overlayState.context.findRenderObject()! as RenderBox;
+
+    final Offset origin = button.localToGlobal(Offset.zero, ancestor: overlay);
+    final Size size = button.size;
+    final Rect anchorRect = origin & size;
+    final RelativeRect position = RelativeRect.fromRect(
+      anchorRect,
+      Offset.zero & overlay.size,
+    );
+
+    final double screenH = MediaQuery.sizeOf(context).height;
+    final String? picked = await showMenu<String>(
       context: context,
-      backgroundColor: AppColors.cardLight,
-      showDragHandle: true,
-      builder: (BuildContext bc) {
-        return Directionality(
-          textDirection: TextDirection.rtl,
-          child: SafeArea(
-            child: ListView(
-              padding: const EdgeInsets.only(bottom: 16),
-              children: <Widget>[
-                ListTile(
-                  title: const Text('كل المدن'),
-                  trailing: _cityFilter == null
-                      ? Icon(Icons.check, color: _PalUi.primaryBlue)
-                      : null,
-                  onTap: () {
-                    setState(() => _cityFilter = null);
-                    Navigator.pop(bc);
-                  },
-                ),
-                ...cities.map(
-                  (String c) => ListTile(
-                    title: Text(c),
-                    trailing: _cityFilter == c
-                        ? Icon(Icons.check, color: _PalUi.primaryBlue)
-                        : null,
-                    onTap: () {
-                      setState(() => _cityFilter = c);
-                      Navigator.pop(bc);
-                    },
-                  ),
-                ),
-              ],
+      position: position,
+      color: AppColors.cardLight,
+      surfaceTintColor: Colors.transparent,
+      elevation: 10,
+      shadowColor: Colors.black.withValues(alpha: 0.14),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: const BorderSide(color: AppColors.borderSubtleLight),
+      ),
+      constraints: BoxConstraints(
+        minWidth: math.min(
+          math.max(anchorRect.width, 196),
+          overlay.size.width - 24,
+        ),
+        maxWidth: overlay.size.width - 24,
+        maxHeight: math.min(screenH * 0.42, 280),
+      ),
+      clipBehavior: Clip.antiAlias,
+      items: <PopupMenuEntry<String>>[
+        PopupMenuItem<String>(
+          value: '', // all cities
+          padding: EdgeInsets.zero,
+          child: _CityMenuPopupRow(
+            label: 'كل المدن',
+            selected: _cityFilter == null,
+          ),
+        ),
+        ...cities.map(
+          (String c) => PopupMenuItem<String>(
+            value: c,
+            padding: EdgeInsets.zero,
+            child: _CityMenuPopupRow(
+              label: cityDisplayNameAr(c),
+              selected: _cityFilter == c,
             ),
           ),
-        );
-      },
+        ),
+      ],
     );
+
+    if (!mounted || picked == null) {
+      return;
+    }
+    setState(() {
+      _cityFilter = picked.isEmpty ? null : picked;
+    });
   }
 
   Widget _buildHomeBody(BuildContext context) {
     final CheckpointProvider cp = context.watch<CheckpointProvider>();
+    final SavedCheckpointsProvider saved =
+        context.watch<SavedCheckpointsProvider>();
     final Set<String> citySet = <String>{};
     for (final Checkpoint item in cp.items) {
       final String loc = item.location.trim();
@@ -165,12 +296,18 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
         citySet.add(loc);
       }
     }
-    final List<String> cities = citySet.toList()..sort();
+    final List<String> cities = citySet.toList()
+      ..sort(
+        (String a, String b) =>
+            cityDisplayNameAr(a).compareTo(cityDisplayNameAr(b)),
+      );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         _BlueHeader(
+          savedHasBookmarks: saved.ids.isNotEmpty,
+          onSavedPressed: () => unawaited(_openSavedCheckpointsScreen()),
           onFavoritesPressed: () => unawaited(_openFavoritesIfAllowed()),
           onMenuPressed: () async {
             await showModalBottomSheet<void>(
@@ -206,117 +343,150 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
           },
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          child: _MainSegmentSwitch(
-            selectedIndex: _mainTab,
-            onChanged: (int i) => setState(() => _mainTab = i),
+          padding: const EdgeInsets.fromLTRB(
+            AppLayout.pagePaddingH,
+            AppLayout.spaceMd,
+            AppLayout.pagePaddingH,
+            0,
+          ),
+          child: Material(
+            color: AppColors.cardLight,
+            elevation: 2,
+            surfaceTintColor: Colors.transparent,
+            shadowColor: Colors.black.withValues(alpha: 0.07),
+            borderRadius: BorderRadius.circular(AppLayout.radiusLg),
+            child: Padding(
+              padding: const EdgeInsets.all(AppLayout.spaceSm),
+              child: _MainSegmentSwitch(
+                selectedIndex: _mainTab,
+                onChanged: (int i) => setState(() => _mainTab = i),
+              ),
+            ),
           ),
         ),
         if (_mainTab == 0)
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: <Widget>[
-                Expanded(
-                  flex: 10,
-                  child: ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: _searchController,
-                    builder: (_, TextEditingValue v, _) {
-                      return Material(
-                        color: AppColors.cardLight,
-                        elevation: 1,
-                        surfaceTintColor: Colors.transparent,
-                        shadowColor: Colors.black.withValues(alpha: 0.06),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(999),
-                          side: const BorderSide(
-                            color: AppColors.borderSubtleLight,
-                          ),
-                        ),
-                        child: TextField(
-                          controller: _searchController,
-                          textAlign: TextAlign.right,
-                          textInputAction: TextInputAction.search,
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(fontSize: 14.5),
-                          onChanged: (String s) =>
-                              setState(() => _searchQuery = s),
-                          decoration: InputDecoration(
-                            isDense: true,
-                            border: InputBorder.none,
-                            hintText: 'بحث بالاسم أو الحالة…',
-                            hintStyle: TextStyle(
-                              color: AppColors.textMutedLight
-                                  .withValues(alpha: 0.92),
-                              fontSize: 14,
+            padding: const EdgeInsets.fromLTRB(
+              AppLayout.pagePaddingH,
+              AppLayout.spaceMd,
+              AppLayout.pagePaddingH,
+              AppLayout.spaceSm,
+            ),
+            child: Material(
+              color: AppColors.cardLight,
+              elevation: 2,
+              surfaceTintColor: Colors.transparent,
+              shadowColor: Colors.black.withValues(alpha: 0.07),
+              borderRadius: BorderRadius.circular(AppLayout.radiusLg),
+              child: Padding(
+                padding: const EdgeInsetsDirectional.only(
+                  start: AppLayout.spaceMd,
+                  end: AppLayout.spaceMd,
+                  top: 10,
+                  bottom: 10,
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: <Widget>[
+                    Expanded(
+                      flex: 10,
+                      child: ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: _searchController,
+                        builder: (_, TextEditingValue v, _) {
+                          return Material(
+                            color: AppColors.shellBackground,
+                            elevation: 0,
+                            surfaceTintColor: Colors.transparent,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                AppLayout.radiusMd + 6,
+                              ),
+                              side: BorderSide(
+                                color: AppColors.borderSubtleLight.withValues(
+                                  alpha: 0.9,
+                                ),
+                              ),
                             ),
-                            prefixIcon: Icon(
-                              Icons.search_rounded,
-                              color: AppColors.textMutedLight,
-                              size: 21,
-                            ),
-                            suffixIcon: v.text.isNotEmpty
-                                ? IconButton(
-                                    tooltip: 'مسح',
-                                    visualDensity: VisualDensity.compact,
-                                    onPressed: _clearSearch,
-                                    icon: Icon(
-                                      Icons.close_rounded,
-                                      color: AppColors.textMutedLight,
-                                      size: 20,
+                            child: TextField(
+                              controller: _searchController,
+                              textAlign: TextAlign.right,
+                              textInputAction: TextInputAction.search,
+                              style: Theme.of(
+                                context,
+                              ).textTheme.bodyMedium?.copyWith(fontSize: 14.5),
+                              onChanged: (String s) =>
+                                  setState(() => _searchQuery = s),
+                              decoration: InputDecoration(
+                                isDense: true,
+                                border: InputBorder.none,
+                                hintText: 'بحث بالاسم أو الحالة…',
+                                hintStyle: TextStyle(
+                                  color: AppColors.textMutedLight.withValues(
+                                    alpha: 0.92,
+                                  ),
+                                  fontSize: 14,
+                                ),
+                                prefixIcon: Icon(
+                                  Icons.search_rounded,
+                                  color: AppColors.textMutedLight,
+                                  size: 21,
+                                ),
+                                suffixIcon: v.text.isNotEmpty
+                                    ? IconButton(
+                                        tooltip: 'مسح',
+                                        visualDensity: VisualDensity.compact,
+                                        onPressed: _clearSearch,
+                                        icon: Icon(
+                                          Icons.close_rounded,
+                                          color: AppColors.textMutedLight,
+                                          size: 20,
+                                        ),
+                                      )
+                                    : null,
+                                contentPadding:
+                                    const EdgeInsetsDirectional.only(
+                                      start: 4,
+                                      end: 4,
+                                      top: 10,
+                                      bottom: 10,
                                     ),
-                                  )
-                                : null,
-                            contentPadding:
-                                const EdgeInsetsDirectional.only(
-                              start: 4,
-                              end: 4,
-                              top: 10,
-                              bottom: 10,
+                              ),
                             ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  flex: 14,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: _FilterChipsRow(
-                      cityLabel: _cityFilter ?? 'اختر مدينة',
-                      pinnedOn: _pinnedFilter,
-                      closestOn: _nearestListMode,
-                      compactOn: _compactCards,
-                      onCityTap: () => _showCityPicker(cities),
-                      onPinnedTap: () {
-                        setState(() => _pinnedFilter = !_pinnedFilter);
-                        if (_pinnedFilter && mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text('المثبتة: قريباً')),
                           );
-                        }
-                      },
-                      onClosestTap: () {
-                        final bool next = !_nearestListMode;
-                        setState(() => _nearestListMode = next);
-                        final UserLocationProvider loc =
-                            context.read<UserLocationProvider>();
-                        loc.setNearestModeActive(next);
-                        if (next && mounted) {
-                          loc.resolve();
-                        }
-                      },
-                      onCompactTap: () =>
-                          setState(() => _compactCards = !_compactCards),
+                        },
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: AppLayout.spaceSm),
+                    Expanded(
+                      flex: 14,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: _FilterChipsRow(
+                          cityChipKey: _cityMenuAnchorKey,
+                          cityLabel: _cityFilter == null
+                              ? 'اختر مدينة'
+                              : cityDisplayNameAr(_cityFilter!),
+                          closestOn: _nearestListMode,
+                          compactOn: _compactCards,
+                          onCityTap: () => unawaited(_openCityMenu(cities)),
+                          onClosestTap: () {
+                            final bool next = !_nearestListMode;
+                            setState(() => _nearestListMode = next);
+                            final UserLocationProvider loc = context
+                                .read<UserLocationProvider>();
+                            loc.setNearestModeActive(next);
+                            if (next && mounted) {
+                              loc.resolve();
+                            }
+                          },
+                          onCompactTap: () =>
+                              setState(() => _compactCards = !_compactCards),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         Expanded(
@@ -325,8 +495,8 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
                   nearestMode: _nearestListMode,
                   onNearestModeChanged: (bool enabled) {
                     setState(() => _nearestListMode = enabled);
-                    final UserLocationProvider loc =
-                        context.read<UserLocationProvider>();
+                    final UserLocationProvider loc = context
+                        .read<UserLocationProvider>();
                     loc.setNearestModeActive(enabled);
                     if (enabled && mounted) {
                       loc.resolve();
@@ -335,15 +505,6 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
                   searchQuery: _searchQuery,
                   compactMode: _compactCards,
                   cityFilter: _cityFilter,
-                  promoVisible: _promoVisible,
-                  onDismissPromo: () => setState(() => _promoVisible = false),
-                  onActivatePromo: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('تفعيل الإشعارات من إعدادات الجهاز'),
-                      ),
-                    );
-                  },
                 )
               : Center(
                   child: Padding(
@@ -357,13 +518,6 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
                     ),
                   ),
                 ),
-        ),
-        _ShareUpdatesBar(
-          onShareTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('مشاركة تحديث — قريباً')),
-            );
-          },
         ),
       ],
     );
@@ -414,7 +568,7 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
               1 => KeyedSubtree(
                 key: const ValueKey<String>('plan'),
                 child: _buildSecondaryPane(
-                  'تخطيط',
+                  'خريطة',
                   const CheckpointMapScreen(),
                 ),
               ),
@@ -467,47 +621,108 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
               ),
             },
           ),
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: _bottomNavIndex,
-            height: 72,
-            onDestinationSelected: (int i) {
-              final int prev = _bottomNavIndex;
-              setState(() => _bottomNavIndex = i);
-              if (i == 0 && prev != 0 && mounted && _nearestListMode) {
-                context.read<UserLocationProvider>().resolve();
-              }
-            },
-            destinations: <NavigationDestination>[
-              NavigationDestination(
-                icon: const Icon(Icons.home_outlined),
-                selectedIcon: const Icon(Icons.home, color: _PalUi.primaryBlue),
-                label: 'الرئيسية',
-              ),
-              NavigationDestination(
-                icon: const Icon(Icons.map_outlined),
-                selectedIcon: const Icon(
-                  Icons.map_rounded,
-                  color: _PalUi.primaryBlue,
+          bottomNavigationBar: SafeArea(
+            top: false,
+            minimum: EdgeInsets.zero,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+              child: Material(
+                elevation: 14,
+                shadowColor: Colors.black.withValues(alpha: 0.12),
+                surfaceTintColor: Colors.transparent,
+                color: AppColors.cardLight,
+                borderRadius: BorderRadius.circular(AppLayout.radiusLg + 4),
+                clipBehavior: Clip.antiAlias,
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(AppLayout.radiusLg + 4),
+                    border: Border.all(
+                      color: AppColors.borderSubtleLight.withValues(
+                        alpha: 0.85,
+                      ),
+                    ),
+                  ),
+                  child: NavigationBar(
+                    backgroundColor: Colors.transparent,
+                    surfaceTintColor: Colors.transparent,
+                    indicatorColor: _PalUi.primaryBlue.withValues(alpha: 0.24),
+                    selectedIndex: _screenToRailIndex(_bottomNavIndex),
+                    height: 78,
+                    labelBehavior:
+                        NavigationDestinationLabelBehavior.alwaysShow,
+                    animationDuration: const Duration(milliseconds: 280),
+                    onDestinationSelected: (int railIndex) {
+                      final int? nextScreen = _screenIndexFromRail(railIndex);
+                      if (nextScreen == null) {
+                        unawaited(
+                          Navigator.of(context).push<void>(
+                            MaterialPageRoute<void>(
+                              builder: (_) =>
+                                  const CheckpointUpdatePickerScreen(),
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+                      final int prev = _bottomNavIndex;
+                      setState(() => _bottomNavIndex = nextScreen);
+                      if (nextScreen == 0 &&
+                          prev != 0 &&
+                          mounted &&
+                          _nearestListMode) {
+                        context.read<UserLocationProvider>().resolve();
+                      }
+                    },
+                    destinations: <NavigationDestination>[
+                      NavigationDestination(
+                        icon: const Icon(Icons.home_outlined, size: 24),
+                        selectedIcon: const Icon(
+                          Icons.home_rounded,
+                          size: 26,
+                          color: _PalUi.primaryBlue,
+                        ),
+                        label: 'الرئيسية',
+                      ),
+                      NavigationDestination(
+                        icon: const Icon(Icons.map_outlined, size: 24),
+                        selectedIcon: const Icon(
+                          Icons.map_rounded,
+                          size: 26,
+                          color: _PalUi.primaryBlue,
+                        ),
+                        label: 'خريطة',
+                      ),
+                      NavigationDestination(
+                        icon: _ShareNavIcon(selected: false),
+                        selectedIcon: _ShareNavIcon(selected: true),
+                        label: 'تحديث حالة حاجز',
+                      ),
+                      NavigationDestination(
+                        icon: const Icon(
+                          Icons.notifications_none_rounded,
+                          size: 24,
+                        ),
+                        selectedIcon: const Icon(
+                          Icons.notifications_rounded,
+                          size: 26,
+                          color: _PalUi.primaryBlue,
+                        ),
+                        label: 'الإشعارات',
+                      ),
+                      NavigationDestination(
+                        icon: const Icon(Icons.menu_rounded, size: 24),
+                        selectedIcon: const Icon(
+                          Icons.menu_open_rounded,
+                          size: 26,
+                          color: _PalUi.primaryBlue,
+                        ),
+                        label: 'الإعدادات',
+                      ),
+                    ],
+                  ),
                 ),
-                label: 'تخطيط',
               ),
-              NavigationDestination(
-                icon: const Icon(Icons.notifications_none_rounded),
-                selectedIcon: const Icon(
-                  Icons.notifications_rounded,
-                  color: _PalUi.primaryBlue,
-                ),
-                label: 'الإشعارات',
-              ),
-              NavigationDestination(
-                icon: const Icon(Icons.menu_rounded),
-                selectedIcon: const Icon(
-                  Icons.menu_open_rounded,
-                  color: _PalUi.primaryBlue,
-                ),
-                label: 'الإعدادات',
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -554,19 +769,34 @@ class _BlueHeader extends StatelessWidget {
   const _BlueHeader({
     required this.onMenuPressed,
     required this.onFavoritesPressed,
+    required this.savedHasBookmarks,
+    required this.onSavedPressed,
   });
 
   final VoidCallback onMenuPressed;
   final VoidCallback onFavoritesPressed;
+
+  /// أيقونة «المثبتة» البيضاء فقط بجانب المفضلة.
+  final bool savedHasBookmarks;
+  final VoidCallback onSavedPressed;
 
   @override
   Widget build(BuildContext context) {
     final double top = MediaQuery.paddingOf(context).top;
     return Container(
       width: double.infinity,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: _PalUi.primaryBlue,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(22)),
+        borderRadius: const BorderRadius.vertical(
+          bottom: Radius.circular(AppLayout.radiusXl),
+        ),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: _PalUi.primaryBlue.withValues(alpha: 0.35),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       padding: EdgeInsets.fromLTRB(8, top + 8, 8, 18),
       child: Stack(
@@ -582,13 +812,44 @@ class _BlueHeader extends StatelessWidget {
           ),
           Align(
             alignment: Alignment.centerLeft,
-            child: IconButton(
-              tooltip: 'المفضلة',
-              onPressed: onFavoritesPressed,
-              icon: Icon(
-                Icons.favorite_border_rounded,
-                color: Colors.white.withValues(alpha: 0.95),
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              textDirection: TextDirection.ltr,
+              children: <Widget>[
+                IconButton(
+                  tooltip: 'المفضلة',
+                  onPressed: onFavoritesPressed,
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints(
+                    minWidth: 42,
+                    minHeight: 42,
+                  ),
+                  padding: EdgeInsets.zero,
+                  icon: Icon(
+                    Icons.favorite_border_rounded,
+                    color: Colors.white.withValues(alpha: 0.95),
+                    size: 26,
+                  ),
+                ),
+                const SizedBox(width: 2),
+                IconButton(
+                  tooltip: 'المثبتة',
+                  onPressed: onSavedPressed,
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints(
+                    minWidth: 42,
+                    minHeight: 42,
+                  ),
+                  padding: EdgeInsets.zero,
+                  icon: Icon(
+                    savedHasBookmarks
+                        ? Icons.bookmark_rounded
+                        : Icons.bookmark_border_rounded,
+                    color: Colors.white.withValues(alpha: 0.95),
+                    size: 26,
+                  ),
+                ),
+              ],
             ),
           ),
           Text(
@@ -622,8 +883,7 @@ class _MainSegmentSwitch extends StatelessWidget {
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: _PalUi.segmentInactiveBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.borderSubtleLight),
+        borderRadius: BorderRadius.circular(AppLayout.radiusMd),
       ),
       child: Row(
         children: <Widget>[
@@ -667,7 +927,7 @@ class _SegmentTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: selected ? AppColors.cardLight : Colors.transparent,
-      borderRadius: BorderRadius.circular(11),
+      borderRadius: BorderRadius.circular(AppLayout.radiusSm + 1),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
@@ -708,22 +968,20 @@ class _SegmentTile extends StatelessWidget {
 /// Filter chips only (no scroll); parent supplies [SingleChildScrollView].
 class _FilterChipsRow extends StatelessWidget {
   const _FilterChipsRow({
+    required this.cityChipKey,
     required this.cityLabel,
-    required this.pinnedOn,
     required this.closestOn,
     required this.compactOn,
     required this.onCityTap,
-    required this.onPinnedTap,
     required this.onClosestTap,
     required this.onCompactTap,
   });
 
+  final Key cityChipKey;
   final String cityLabel;
-  final bool pinnedOn;
   final bool closestOn;
   final bool compactOn;
   final VoidCallback onCityTap;
-  final VoidCallback onPinnedTap;
   final VoidCallback onClosestTap;
   final VoidCallback onCompactTap;
 
@@ -733,17 +991,11 @@ class _FilterChipsRow extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
         _FilterChipButton(
+          key: cityChipKey,
           icon: Icons.keyboard_arrow_down_rounded,
           label: cityLabel,
           selected: cityLabel != 'اختر مدينة',
           onTap: onCityTap,
-        ),
-        const SizedBox(width: 8),
-        _FilterChipButton(
-          icon: Icons.bookmark_outline_rounded,
-          label: 'المثبتة',
-          selected: pinnedOn,
-          onTap: onPinnedTap,
         ),
         const SizedBox(width: 8),
         _FilterChipButton(
@@ -766,6 +1018,7 @@ class _FilterChipsRow extends StatelessWidget {
 
 class _FilterChipButton extends StatelessWidget {
   const _FilterChipButton({
+    super.key,
     required this.icon,
     required this.label,
     required this.selected,
@@ -780,43 +1033,58 @@ class _FilterChipButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: selected
-          ? _PalUi.primaryBlue.withValues(alpha: 0.22)
-          : Colors.transparent,
-      borderRadius: BorderRadius.circular(999),
+      color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(999),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Ink(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
+            color: selected
+                ? _PalUi.primaryBlue.withValues(alpha: 0.15)
+                : AppColors.shellBackground,
             border: Border.all(
+              width: 1,
               color: selected
-                  ? _PalUi.primaryBlue.withValues(alpha: 0.35)
+                  ? _PalUi.primaryBlue.withValues(alpha: 0.38)
                   : AppColors.borderSubtleLight,
             ),
+            boxShadow: selected
+                ? null
+                : <BoxShadow>[
+                    BoxShadow(
+                      color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Icon(
-                icon,
-                size: 18,
-                color: selected ? _PalUi.primaryBlue : AppColors.textMutedLight,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Icon(
+                  icon,
+                  size: 17,
                   color: selected
-                      ? AppColors.textPrimaryLight
+                      ? _PalUi.primaryBlue
                       : AppColors.textMutedLight,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
                 ),
-              ),
-            ],
+                const SizedBox(width: 7),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: selected
+                        ? AppColors.textPrimaryLight
+                        : AppColors.textMutedLight,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12.5,
+                    letterSpacing: -0.1,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -824,53 +1092,88 @@ class _FilterChipButton extends StatelessWidget {
   }
 }
 
-class _ShareUpdatesBar extends StatelessWidget {
-  const _ShareUpdatesBar({required this.onShareTap});
+/// One row inside [showMenu] for city / «كل المدن».
+class _CityMenuPopupRow extends StatelessWidget {
+  const _CityMenuPopupRow({required this.label, required this.selected});
 
-  final VoidCallback onShareTap;
+  final String label;
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          Text(
-            'خليك قريب من تحديثاتنا عبر صفحاتنا',
-            textAlign: TextAlign.center,
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: AppColors.textMutedLight),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
+      width: double.infinity,
+      padding: const EdgeInsetsDirectional.only(
+        start: 12,
+        end: 12,
+        top: 11,
+        bottom: 11,
+      ),
+      decoration: BoxDecoration(
+        color: selected
+            ? _PalUi.primaryBlue.withValues(alpha: 0.12)
+            : Colors.transparent,
+      ),
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Row(
+          children: <Widget>[
+            Expanded(
+              child: Text(
+                label,
+                textAlign: TextAlign.right,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                  fontSize: 14,
+                  color: selected
+                      ? _PalUi.primaryBlue
+                      : AppColors.textPrimaryLight,
+                ),
+              ),
+            ),
+            if (selected) ...<Widget>[
+              const SizedBox(width: 10),
+              Icon(Icons.check_rounded, size: 20, color: _PalUi.primaryBlue),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// أيقونة زر «تحديث حالة حاجز» داخل [NavigationBar] (بين الخريطة والإشعارات).
+class _ShareNavIcon extends StatelessWidget {
+  const _ShareNavIcon({required this.selected});
+
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'تحديث أو مشاركة حالة نقطة تفتيش',
+      button: true,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: selected
+              ? _PalUi.primaryBlue.withValues(alpha: 0.22)
+              : _PalUi.primaryBlue.withValues(alpha: 0.12),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: _PalUi.primaryBlue.withValues(alpha: selected ? 0.45 : 0.3),
           ),
-          const SizedBox(height: 10),
-          FilledButton.icon(
-            style: FilledButton.styleFrom(
-              backgroundColor: _PalUi.primaryBlue,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(
-                vertical: 14,
-                horizontal: 12,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-            onPressed: onShareTap,
-            icon: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.add, size: 20),
-            ),
-            label: const Text(
-              'شاركنا بتحديث',
-              style: TextStyle(fontWeight: FontWeight.w800),
-            ),
-          ),
-        ],
+        ),
+        child: Icon(
+          Icons.edit_note_rounded,
+          size: 23,
+          color: _PalUi.primaryBlue,
+        ),
       ),
     );
   }

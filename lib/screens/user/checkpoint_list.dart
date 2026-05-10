@@ -5,9 +5,12 @@ import 'package:provider/provider.dart';
 import '../../models/checkpoint.dart';
 import '../../providers/checkpoint_provider.dart';
 import '../../providers/favorite_checkpoints_provider.dart';
+import '../../providers/saved_checkpoints_provider.dart';
 import '../../providers/user_location_provider.dart';
 import '../../theme/app_colors.dart';
+import '../../theme/app_layout.dart';
 import '../../utils/ar_relative_time.dart';
+import '../../utils/checkpoint_search.dart';
 import '../../utils/guest_session.dart';
 import '../widgets/checkpoint_card.dart';
 import '../widgets/reference_checkpoint_tile.dart';
@@ -35,20 +38,25 @@ Future<void> _toggleFavoriteLoggedInIfAllowed(
   favorites.toggle(checkpointId);
 }
 
+Future<void> _toggleSavedLoggedInIfAllowed(
+  BuildContext context,
+  SavedCheckpointsProvider saved,
+  String checkpointId,
+) async {
+  if (!await ensureLoggedInForSaved(context)) {
+    return;
+  }
+  if (!context.mounted) {
+    return;
+  }
+  saved.toggle(checkpointId);
+}
+
 String _formatDistanceAwayKm(double km) {
   if (km < 10) {
     return '${km.toStringAsFixed(1)} km away';
   }
   return '${km.round()} km away';
-}
-
-DateTime? _latestUpdate(Checkpoint c) {
-  final DateTime? a = c.entranceUpdatedAt;
-  final DateTime? b = c.exitUpdatedAt;
-  if (a != null && b != null) {
-    return a.isAfter(b) ? a : b;
-  }
-  return a ?? b;
 }
 
 /// قائمة عمودية بنفس أسلوب المرجع.
@@ -61,9 +69,6 @@ class CheckpointList extends StatefulWidget {
     this.searchQuery = '',
     this.compactMode = false,
     this.cityFilter,
-    this.promoVisible = true,
-    this.onDismissPromo,
-    this.onActivatePromo,
   });
 
   final bool nearestMode;
@@ -71,9 +76,6 @@ class CheckpointList extends StatefulWidget {
   final String searchQuery;
   final bool compactMode;
   final String? cityFilter;
-  final bool promoVisible;
-  final VoidCallback? onDismissPromo;
-  final VoidCallback? onActivatePromo;
 
   @override
   State<CheckpointList> createState() => _CheckpointListState();
@@ -120,9 +122,7 @@ class _CheckpointListState extends State<CheckpointList> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(err)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
     });
   }
 
@@ -137,7 +137,7 @@ class _CheckpointListState extends State<CheckpointList> {
       );
     }
     if (q.isNotEmpty) {
-      out = out.where((Checkpoint c) => _checkpointMatchesSearch(c, q));
+      out = out.where((Checkpoint c) => checkpointMatchesUserSearch(c, q));
     }
     final List<Checkpoint> list = out.toList(growable: false);
     list.sort(
@@ -147,68 +147,34 @@ class _CheckpointListState extends State<CheckpointList> {
     return list;
   }
 
-  /// Matches checkpoint name and directional status (المدينة تُختار من القائمة أعلاه).
-  static bool _checkpointMatchesSearch(Checkpoint c, String q) {
-    if (c.name.toLowerCase().contains(q)) {
-      return true;
-    }
-    final String en = CheckpointStatus.normalize(c.entranceStatus);
-    final String ex = CheckpointStatus.normalize(c.exitStatus);
-    if (en.contains(q) || ex.contains(q)) {
-      return true;
-    }
-    final String enAr = CheckpointStatus.labelAr(en).toLowerCase();
-    final String exAr = CheckpointStatus.labelAr(ex).toLowerCase();
-    if (enAr.contains(q) || exAr.contains(q)) {
-      return true;
-    }
-    if (CheckpointStatus.badgeLabelAr(en).toLowerCase().contains(q) ||
-        CheckpointStatus.badgeLabelAr(ex).toLowerCase().contains(q)) {
-      return true;
-    }
-    return false;
-  }
-
   List<Widget> _buildBrowseItems(
     BuildContext context,
     List<Checkpoint> filtered,
     FavoriteCheckpointsProvider favorites,
+    SavedCheckpointsProvider saved,
   ) {
     final List<Widget> tiles = <Widget>[];
-    bool promoInserted = false;
     for (int i = 0; i < filtered.length; i++) {
-      if (widget.promoVisible &&
-          !promoInserted &&
-          filtered.length >= 2 &&
-          i == 1) {
-        tiles.add(
-          _RoadSummaryPromoCard(
-            onLater: widget.onDismissPromo,
-            onActivate: widget.onActivatePromo,
-          ),
-        );
-        promoInserted = true;
-      }
       final Checkpoint c = filtered[i];
       tiles.add(
         Padding(
           padding: EdgeInsets.fromLTRB(
-            12,
+            AppLayout.pagePaddingH,
             0,
-            12,
+            AppLayout.pagePaddingH,
             widget.compactMode ? 8 : 10,
           ),
           child: ReferenceCheckpointTile(
             checkpoint: c,
             compact: widget.compactMode,
             stripColor: checkpointStripColor(c),
-            subtitle: arabicRelativeSince(_latestUpdate(c)),
+            subtitle: arabicRelativeSince(c.latestDirectionalUpdate),
+            isSaved: saved.isSaved(c.id),
+            onSavedTap: () =>
+                _toggleSavedLoggedInIfAllowed(context, saved, c.id),
             isFavorite: favorites.isFavorite(c.id),
-            onFavoriteTap: () => _toggleFavoriteLoggedInIfAllowed(
-              context,
-              favorites,
-              c.id,
-            ),
+            onFavoriteTap: () =>
+                _toggleFavoriteLoggedInIfAllowed(context, favorites, c.id),
             onDirectionTap: (String direction) {
               showCheckpointStatusSheet(
                 context: context,
@@ -223,22 +189,6 @@ class _CheckpointListState extends State<CheckpointList> {
                 ),
               );
             },
-          ),
-        ),
-      );
-    }
-    if (widget.promoVisible && filtered.length == 1) {
-      tiles.add(
-        Padding(
-          padding: EdgeInsets.fromLTRB(
-            12,
-            0,
-            12,
-            widget.compactMode ? 8 : 10,
-          ),
-          child: _RoadSummaryPromoCard(
-            onLater: widget.onDismissPromo,
-            onActivate: widget.onActivatePromo,
           ),
         ),
       );
@@ -268,8 +218,8 @@ class _CheckpointListState extends State<CheckpointList> {
         return 1;
       }
       return a.checkpoint.name.toLowerCase().compareTo(
-            b.checkpoint.name.toLowerCase(),
-          );
+        b.checkpoint.name.toLowerCase(),
+      );
     });
     if (rows.length <= _kNearestListMaxItems) {
       return rows;
@@ -281,34 +231,22 @@ class _CheckpointListState extends State<CheckpointList> {
     BuildContext context,
     List<_NearbyRow> rows,
     FavoriteCheckpointsProvider favorites,
+    SavedCheckpointsProvider saved,
   ) {
     final List<Widget> tiles = <Widget>[];
-    bool promoInserted = false;
     for (int i = 0; i < rows.length; i++) {
-      if (widget.promoVisible &&
-          !promoInserted &&
-          rows.length >= 2 &&
-          i == 1) {
-        tiles.add(
-          _RoadSummaryPromoCard(
-            onLater: widget.onDismissPromo,
-            onActivate: widget.onActivatePromo,
-          ),
-        );
-        promoInserted = true;
-      }
       final _NearbyRow row = rows[i];
       final Checkpoint c = row.checkpoint;
-      final String rel = arabicRelativeSince(_latestUpdate(c));
+      final String rel = arabicRelativeSince(c.latestDirectionalUpdate);
       final String subtitle = row.distanceKm != null
           ? '$rel · ${_formatDistanceAwayKm(row.distanceKm!)}'
           : '$rel · $_kLocationNotAvailableLabel';
       tiles.add(
         Padding(
           padding: EdgeInsets.fromLTRB(
-            12,
+            AppLayout.pagePaddingH,
             0,
-            12,
+            AppLayout.pagePaddingH,
             widget.compactMode ? 8 : 10,
           ),
           child: ReferenceCheckpointTile(
@@ -316,12 +254,12 @@ class _CheckpointListState extends State<CheckpointList> {
             compact: widget.compactMode,
             stripColor: checkpointStripColor(c),
             subtitle: subtitle,
+            isSaved: saved.isSaved(c.id),
+            onSavedTap: () =>
+                _toggleSavedLoggedInIfAllowed(context, saved, c.id),
             isFavorite: favorites.isFavorite(c.id),
-            onFavoriteTap: () => _toggleFavoriteLoggedInIfAllowed(
-              context,
-              favorites,
-              c.id,
-            ),
+            onFavoriteTap: () =>
+                _toggleFavoriteLoggedInIfAllowed(context, favorites, c.id),
             onDirectionTap: (String direction) {
               showCheckpointStatusSheet(
                 context: context,
@@ -340,22 +278,6 @@ class _CheckpointListState extends State<CheckpointList> {
         ),
       );
     }
-    if (widget.promoVisible && rows.length == 1) {
-      tiles.add(
-        Padding(
-          padding: EdgeInsets.fromLTRB(
-            12,
-            0,
-            12,
-            widget.compactMode ? 8 : 10,
-          ),
-          child: _RoadSummaryPromoCard(
-            onLater: widget.onDismissPromo,
-            onActivate: widget.onActivatePromo,
-          ),
-        ),
-      );
-    }
     return tiles;
   }
 
@@ -366,6 +288,7 @@ class _CheckpointListState extends State<CheckpointList> {
     final UserLocationProvider loc = context.watch<UserLocationProvider>();
     final FavoriteCheckpointsProvider favorites = context
         .watch<FavoriteCheckpointsProvider>();
+    final SavedCheckpointsProvider saved = context.watch<SavedCheckpointsProvider>();
 
     if (provider.loading && provider.items.isEmpty) {
       return const Center(child: CircularProgressIndicator());
@@ -390,7 +313,12 @@ class _CheckpointListState extends State<CheckpointList> {
       return Directionality(
         textDirection: TextDirection.rtl,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+          padding: const EdgeInsets.fromLTRB(
+            AppLayout.pagePaddingH,
+            AppLayout.spaceSm,
+            AppLayout.pagePaddingH,
+            AppLayout.spaceSm,
+          ),
           children: <Widget>[
             Center(
               child: Text(
@@ -412,12 +340,18 @@ class _CheckpointListState extends State<CheckpointList> {
         context,
         citySearchFiltered,
         favorites,
+        saved,
       );
       if (body.isEmpty) {
         return Directionality(
           textDirection: TextDirection.rtl,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+            padding: const EdgeInsets.fromLTRB(
+              AppLayout.pagePaddingH,
+              AppLayout.spaceSm,
+              AppLayout.pagePaddingH,
+              AppLayout.spaceSm,
+            ),
             children: <Widget>[
               Center(
                 child: Text(
@@ -434,7 +368,12 @@ class _CheckpointListState extends State<CheckpointList> {
       return Directionality(
         textDirection: TextDirection.rtl,
         child: ListView(
-          padding: const EdgeInsets.only(top: 4, bottom: 8),
+          padding: const EdgeInsets.fromLTRB(
+            0,
+            AppLayout.spaceSm,
+            0,
+            AppLayout.spaceSm,
+          ),
           children: body,
         ),
       );
@@ -446,7 +385,12 @@ class _CheckpointListState extends State<CheckpointList> {
       return Directionality(
         textDirection: TextDirection.rtl,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+          padding: const EdgeInsets.fromLTRB(
+            AppLayout.pagePaddingH,
+            AppLayout.spaceSm,
+            AppLayout.pagePaddingH,
+            AppLayout.spaceSm,
+          ),
           children: <Widget>[
             const SizedBox(height: 24),
             const Center(child: CircularProgressIndicator()),
@@ -476,7 +420,12 @@ class _CheckpointListState extends State<CheckpointList> {
       return Directionality(
         textDirection: TextDirection.rtl,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+          padding: const EdgeInsets.fromLTRB(
+            AppLayout.pagePaddingH,
+            AppLayout.spaceSm,
+            AppLayout.pagePaddingH,
+            AppLayout.spaceSm,
+          ),
           children: <Widget>[
             Center(
               child: Text(
@@ -491,107 +440,19 @@ class _CheckpointListState extends State<CheckpointList> {
       );
     }
 
-    final List<Widget> children = _buildNearestItems(context, rows, favorites);
+    final List<Widget> children =
+        _buildNearestItems(context, rows, favorites, saved);
 
     return Directionality(
       textDirection: TextDirection.rtl,
       child: ListView(
-        padding: const EdgeInsets.only(top: 4, bottom: 8),
+        padding: const EdgeInsets.fromLTRB(
+          0,
+          AppLayout.spaceSm,
+          0,
+          AppLayout.spaceSm,
+        ),
         children: children,
-      ),
-    );
-  }
-}
-
-class _RoadSummaryPromoCard extends StatelessWidget {
-  const _RoadSummaryPromoCard({
-    required this.onLater,
-    required this.onActivate,
-  });
-
-  final VoidCallback? onLater;
-  final VoidCallback? onActivate;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: ReferenceCheckpointTileTheme.cardBg,
-          border: Border.all(color: AppColors.borderSubtleLight),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          textDirection: TextDirection.rtl,
-          children: <Widget>[
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: ReferenceCheckpointTileTheme.primaryBlue.withValues(
-                  alpha: 0.2,
-                ),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.groups_2_outlined,
-                color: ReferenceCheckpointTileTheme.primaryBlue,
-                size: 28,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    'اشعارات بملخص الطريق',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: AppColors.textPrimaryLight,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'في الوقت المناسب لك!',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textMutedLight,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: <Widget>[
-                      FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor:
-                              ReferenceCheckpointTileTheme.primaryBlue,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 18,
-                            vertical: 10,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        onPressed: onActivate,
-                        child: const Text('تفعيل'),
-                      ),
-                      const SizedBox(width: 10),
-                      TextButton(
-                        onPressed: onLater,
-                        child: const Text('لاحقاً'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
