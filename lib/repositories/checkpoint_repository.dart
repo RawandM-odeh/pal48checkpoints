@@ -246,4 +246,106 @@ class CheckpointRepository {
   Future<void> deleteCheckpoint(String checkpointId) async {
     await _collection.doc(checkpointId).delete();
   }
+
+  /// قراءة بيانات الوثيقة الخام (لتعبئة نموذج التعديل).
+  Future<Map<String, dynamic>> getCheckpointDocument(String checkpointId) async {
+    final DocumentSnapshot<Map<String, dynamic>> snap =
+        await _collection.doc(checkpointId).get();
+    if (!snap.exists || snap.data() == null) {
+      throw StateError('Checkpoint not found');
+    }
+    return snap.data()!;
+  }
+
+  /// تحديث حقول تعريف الحاجز دون تغيير معرّف الوثيقة ([documentId] = الاسم العربي الحالي).
+  Future<void> updateCheckpointMeta({
+    required String documentId,
+    required String nameEn,
+    required double latitude,
+    required double longitude,
+    required String city,
+    required String extraAliases,
+  }) async {
+    final String docId = documentId.trim();
+    if (docId.isEmpty) {
+      throw ArgumentError('معرّف الحاجز فارغ');
+    }
+    final List<String> aliases = mergeAliases(
+      nameAr: docId,
+      nameEn: nameEn.trim(),
+      extraRaw: extraAliases,
+    );
+    await _collection.doc(docId).update(<String, Object?>{
+      'name_en': nameEn.trim(),
+      'city': city.trim(),
+      'latitude': latitude,
+      'longitude': longitude,
+      'aliases': aliases,
+    });
+  }
+
+  /// نقل الوثيقة إلى معرّف جديد عند تغيير الاسم العربي؛ يُحافظ على باقي الحقول (حالة، سجل، …).
+  Future<void> migrateCheckpointDocument({
+    required String oldDocumentId,
+    required String newNameAr,
+    required String nameEn,
+    required double latitude,
+    required double longitude,
+    required String city,
+    required String extraAliases,
+  }) async {
+    final String oldId = oldDocumentId.trim();
+    final String newId = newNameAr.trim();
+    if (oldId.isEmpty || newId.isEmpty) {
+      throw ArgumentError('اسم الحاجز بالعربي مطلوب');
+    }
+    if (newId.contains('/')) {
+      throw ArgumentError('لا يُسمح بالرمز «/» في الاسم العربي');
+    }
+    if (newId == oldId) {
+      await updateCheckpointMeta(
+        documentId: oldId,
+        nameEn: nameEn,
+        latitude: latitude,
+        longitude: longitude,
+        city: city,
+        extraAliases: extraAliases,
+      );
+      return;
+    }
+
+    final DocumentReference<Map<String, dynamic>> oldRef =
+        _collection.doc(oldId);
+    final DocumentReference<Map<String, dynamic>> newRef =
+        _collection.doc(newId);
+
+    await _firestore.runTransaction((Transaction txn) async {
+      final DocumentSnapshot<Map<String, dynamic>> oldSnap =
+          await txn.get(oldRef);
+      if (!oldSnap.exists || oldSnap.data() == null) {
+        throw StateError('Checkpoint not found');
+      }
+      final DocumentSnapshot<Map<String, dynamic>> dupSnap =
+          await txn.get(newRef);
+      if (dupSnap.exists) {
+        throw StateError('يوجد حاجز بنفس الاسم العربي الجديد');
+      }
+
+      final Map<String, dynamic> data =
+          Map<String, dynamic>.from(oldSnap.data()!);
+      data['name_ar'] = newId;
+      data['name_en'] = nameEn.trim();
+      data['city'] = city.trim();
+      data['latitude'] = latitude;
+      data['longitude'] = longitude;
+      data['aliases'] = mergeAliases(
+        nameAr: newId,
+        nameEn: nameEn.trim(),
+        extraRaw: extraAliases,
+      );
+
+      txn.set(newRef, data);
+      txn.delete(oldRef);
+    });
+  }
 }

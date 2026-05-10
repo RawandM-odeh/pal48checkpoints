@@ -4,8 +4,10 @@ import 'package:provider/provider.dart';
 import '../../config/nearby_config.dart';
 import '../../providers/guest_browse_provider.dart';
 import '../../models/checkpoint.dart';
+import '../../models/stored_notification.dart';
 import '../../providers/checkpoint_provider.dart';
 import '../../providers/notification_provider.dart';
+import '../../repositories/notification_repository.dart';
 import '../../providers/user_location_provider.dart';
 import '../../services/auth_service.dart';
 import '../../theme/app_colors.dart';
@@ -320,11 +322,11 @@ class _UserScreenState extends State<UserScreen> {
                           leading: const Icon(Icons.notifications_outlined),
                           title: const Text('مسح سجل المعاينة'),
                           subtitle: Text(
-                            inbox.entries.isEmpty
+                            inbox.foregroundEntries.isEmpty
                                 ? 'لا توجد عناصر'
-                                : '${inbox.entries.length} سطر',
+                                : '${inbox.foregroundEntries.length} سطر',
                           ),
-                          onTap: inbox.entries.isEmpty
+                          onTap: inbox.foregroundEntries.isEmpty
                               ? null
                               : () {
                                   context.read<NotificationProvider>().clear();
@@ -394,34 +396,154 @@ class _NotificationsBody extends StatelessWidget {
 
   final NotificationProvider inbox;
 
+  static List<_MergedInboxRow> _merge(
+    List<StoredNotification> stored,
+    List<ForegroundInboxEntry> foreground,
+  ) {
+    final Set<String> storedIds =
+        stored.map((StoredNotification s) => s.id).toSet();
+    final List<_MergedInboxRow> merged = <_MergedInboxRow>[];
+
+    for (final ForegroundInboxEntry fg in foreground) {
+      if (fg.dedupeKey != null && storedIds.contains(fg.dedupeKey)) {
+        continue;
+      }
+      if (fg.dedupeKey == null) {
+        final bool dupByContent = stored.any(
+          (StoredNotification s) => s.title == fg.title && s.body == fg.body,
+        );
+        if (dupByContent) {
+          continue;
+        }
+      }
+      merged.add(_MergedInboxRow.foreground(fg));
+    }
+
+    for (final StoredNotification s in stored) {
+      merged.add(_MergedInboxRow.stored(s));
+    }
+
+    return merged;
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (inbox.entries.isEmpty) {
-      return Center(
-        child: Text(
-          'لا توجد إشعارات بعد',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: AppColors.textMutedLight,
+    final NotificationRepository repo = context.read<NotificationRepository>();
+
+    return StreamBuilder<List<StoredNotification>>(
+      stream: repo.watchStoredNotifications(),
+      builder: (
+        BuildContext context,
+        AsyncSnapshot<List<StoredNotification>> snapshot,
+      ) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                'تعذّر تحميل الإشعارات',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleMedium,
               ),
-        ),
-      );
-    }
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: inbox.entries.length,
-      separatorBuilder: (_, _) => const Divider(height: 1),
-      itemBuilder: (BuildContext context, int i) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          child: Text(
-            inbox.entries[i],
-            textAlign: TextAlign.right,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
+            ),
+          );
+        }
+
+        final List<StoredNotification> stored = snapshot.data ?? <StoredNotification>[];
+        final List<_MergedInboxRow> rows =
+            _merge(stored, inbox.foregroundEntries);
+
+        if (rows.isEmpty) {
+          return Center(
+            child: Text(
+              'لا توجد إشعارات بعد',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: AppColors.textMutedLight,
+                  ),
+            ),
+          );
+        }
+
+        return ListView.separated(
+          padding: const EdgeInsets.all(16),
+          itemCount: rows.length,
+          separatorBuilder: (_, _) => const Divider(height: 1),
+          itemBuilder: (BuildContext context, int i) {
+            final _MergedInboxRow row = rows[i];
+            final ThemeData theme = Theme.of(context);
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Text(
+                    row.title.isEmpty ? 'إشعار' : row.title,
+                    textAlign: TextAlign.right,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    row.body,
+                    textAlign: TextAlign.right,
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                  if (row.subtitle != null) ...<Widget>[
+                    const SizedBox(height: 6),
+                    Text(
+                      row.subtitle!,
+                      textAlign: TextAlign.right,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.textMutedLight,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
         );
       },
     );
   }
+}
+
+class _MergedInboxRow {
+  _MergedInboxRow._({
+    required this.title,
+    required this.body,
+    this.subtitle,
+  });
+
+  factory _MergedInboxRow.foreground(ForegroundInboxEntry e) {
+    return _MergedInboxRow._(
+      title: e.title,
+      body: e.body,
+      subtitle: 'الآن',
+    );
+  }
+
+  factory _MergedInboxRow.stored(StoredNotification s) {
+    final DateTime? t = s.sentAt;
+    final String? sub = t != null
+        ? '${t.year}/${t.month.toString().padLeft(2, '0')}/${t.day.toString().padLeft(2, '0')} '
+            '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}'
+        : null;
+    return _MergedInboxRow._(
+      title: s.title,
+      body: s.body,
+      subtitle: sub,
+    );
+  }
+
+  final String title;
+  final String body;
+  final String? subtitle;
 }
 
 class _BlueHeader extends StatelessWidget {
