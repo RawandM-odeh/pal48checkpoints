@@ -67,6 +67,48 @@ class CheckpointProvider extends ChangeNotifier {
     );
   }
 
+  Future<Map<String, dynamic>> getCheckpointDocument(String checkpointId) {
+    return _repository.getCheckpointDocument(checkpointId);
+  }
+
+  Future<void> updateCheckpointMeta({
+    required String documentId,
+    required String nameEn,
+    required double latitude,
+    required double longitude,
+    required String city,
+    required String extraAliases,
+  }) {
+    return _repository.updateCheckpointMeta(
+      documentId: documentId,
+      nameEn: nameEn,
+      latitude: latitude,
+      longitude: longitude,
+      city: city,
+      extraAliases: extraAliases,
+    );
+  }
+
+  Future<void> migrateCheckpointDocument({
+    required String oldDocumentId,
+    required String newNameAr,
+    required String nameEn,
+    required double latitude,
+    required double longitude,
+    required String city,
+    required String extraAliases,
+  }) {
+    return _repository.migrateCheckpointDocument(
+      oldDocumentId: oldDocumentId,
+      newNameAr: newNameAr,
+      nameEn: nameEn,
+      latitude: latitude,
+      longitude: longitude,
+      city: city,
+      extraAliases: extraAliases,
+    );
+  }
+
   @override
   void dispose() {
     _subscription?.cancel();

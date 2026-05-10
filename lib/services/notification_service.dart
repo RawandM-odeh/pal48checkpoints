@@ -17,6 +17,15 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 }
 
+String? _broadcastDedupeKey(Map<String, dynamic> data) {
+  final Object? raw = data['broadcastId'];
+  if (raw is! String) {
+    return null;
+  }
+  final String trimmed = raw.trim();
+  return trimmed.isEmpty ? null : trimmed;
+}
+
 abstract final class NotificationService {
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   static final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
@@ -53,7 +62,11 @@ abstract final class NotificationService {
             message.data['body'] as String? ??
             message.data['gcm.notification.body'] as String? ??
             '';
-        inbox.addForegroundLine(title, body);
+        inbox.addForegroundLine(
+          title,
+          body,
+          dedupeKey: _broadcastDedupeKey(message.data),
+        );
         await _showForegroundLocalNotification(title, body, message.data);
       });
     }
@@ -87,6 +100,7 @@ abstract final class NotificationService {
           inbox.addForegroundLine(
             n.title ?? 'رسالة مفتوحة',
             n.body ?? '',
+            dedupeKey: _broadcastDedupeKey(m.data),
           );
         }
       });

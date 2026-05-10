@@ -11,8 +11,14 @@ abstract final class CheckpointCardStyle {
   static const Color navy = Color(0xFF163E6C);
   static const Color arrowBlue = Color(0xFF4A90D9);
   static const double cardHeight = 220;
-  static const double adminCardHeight = 248;
+  /// ارتفاع خلية الشبكة في الإدارة (محتوى البطاقة أقل؛ المحاذاة للأعلى لتقليل الفراغ).
+  static const double adminCardHeight = 278;
   static const double radius = 16;
+}
+
+enum CheckpointCardAppearance {
+  light,
+  darkUserLike,
 }
 
 /// White rounded card showing entrance/exit status badges + relative times.
@@ -25,6 +31,7 @@ class CheckpointCard extends StatelessWidget {
     this.trailing,
     this.footer,
     this.onCardTap,
+    this.appearance = CheckpointCardAppearance.light,
   });
 
   final Checkpoint checkpoint;
@@ -39,11 +46,26 @@ class CheckpointCard extends StatelessWidget {
   /// Opens detail screen etc.; does not wrap [footer] so delete/actions stay separate.
   final VoidCallback? onCardTap;
 
+  final CheckpointCardAppearance appearance;
+
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
+    final bool dark = appearance == CheckpointCardAppearance.darkUserLike;
+    final Color titleColor =
+        dark ? Colors.white : CheckpointCardStyle.navy;
+    final Color chevronColor =
+        dark ? Colors.white54 : CheckpointCardStyle.arrowBlue;
+    final Color dividerColor = dark
+        ? Colors.white.withValues(alpha: 0.12)
+        : Colors.grey.shade200;
+    final Color midDividerColor = dark
+        ? Colors.white.withValues(alpha: 0.12)
+        : Colors.grey.shade300;
+
     final Widget mainColumn = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
       children: <Widget>[
         SizedBox(
           height: 28,
@@ -55,9 +77,9 @@ class CheckpointCard extends StatelessWidget {
                 top: 0,
                 bottom: 0,
                 child: trailing ??
-                    const Icon(
+                    Icon(
                       Icons.chevron_left_rounded,
-                      color: CheckpointCardStyle.arrowBlue,
+                      color: chevronColor,
                       size: 26,
                     ),
               ),
@@ -70,25 +92,30 @@ class CheckpointCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w700,
-                    color: CheckpointCardStyle.navy,
+                    color: titleColor,
                   ),
                 ),
               ),
             ],
           ),
         ),
-        Divider(height: 16, thickness: 1, color: Colors.grey.shade200),
-        Expanded(
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              textDirection: TextDirection.rtl,
-              children: <Widget>[
+        Divider(height: 16, thickness: 1, color: dividerColor),
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            textDirection: TextDirection.rtl,
+            children: <Widget>[
                 Expanded(
                   child: _DirectionColumn(
+                    appearance: appearance,
                     label: 'الدخول',
                     status: checkpoint.entranceStatus,
                     updatedAt: checkpoint.entranceUpdatedAt,
+                    sourceFootnote: Checkpoint.isInAppUpdateSource(
+                          checkpoint.entranceSource,
+                        )
+                        ? '(تحديث من داخل التطبيق)'
+                        : null,
                     onTap: () => onStatusBadgeTap('entrance'),
                   ),
                 ),
@@ -97,28 +124,33 @@ class CheckpointCard extends StatelessWidget {
                   child: VerticalDivider(
                     width: 1,
                     thickness: 1,
-                    color: Colors.grey.shade300,
+                    color: midDividerColor,
                   ),
                 ),
                 Expanded(
                   child: _DirectionColumn(
+                    appearance: appearance,
                     label: 'الخروج',
                     status: checkpoint.exitStatus,
                     updatedAt: checkpoint.exitUpdatedAt,
+                    sourceFootnote: Checkpoint.isInAppUpdateSource(
+                          checkpoint.exitSource,
+                        )
+                        ? '(تحديث من داخل التطبيق)'
+                        : null,
                     onTap: () => onStatusBadgeTap('exit'),
                   ),
                 ),
               ],
             ),
           ),
-        ),
       ],
     );
 
     return Material(
-      color: Colors.white,
-      elevation: 3,
-      shadowColor: Colors.black.withValues(alpha: 0.12),
+      color: dark ? const Color(0xFF252B38) : Colors.white,
+      elevation: dark ? 2 : 3,
+      shadowColor: Colors.black.withValues(alpha: dark ? 0.35 : 0.12),
       borderRadius: BorderRadius.circular(CheckpointCardStyle.radius),
       clipBehavior: Clip.antiAlias,
       child: Padding(
@@ -132,11 +164,19 @@ class CheckpointCard extends StatelessWidget {
                   onTap: onCardTap,
                   borderRadius:
                       BorderRadius.circular(CheckpointCardStyle.radius - 2),
-                  child: mainColumn,
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: mainColumn,
+                  ),
                 ),
               )
             else
-              Expanded(child: mainColumn),
+              Expanded(
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: mainColumn,
+                ),
+              ),
             if (footer != null) ...<Widget>[
               const SizedBox(height: 8),
               footer!,
@@ -150,20 +190,34 @@ class CheckpointCard extends StatelessWidget {
 
 class _DirectionColumn extends StatelessWidget {
   const _DirectionColumn({
+    required this.appearance,
     required this.label,
     required this.status,
     required this.updatedAt,
     required this.onTap,
+    this.sourceFootnote,
   });
 
+  final CheckpointCardAppearance appearance;
   final String label;
   final String status;
   final DateTime? updatedAt;
   final VoidCallback onTap;
+  final String? sourceFootnote;
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
+    final bool dark = appearance == CheckpointCardAppearance.darkUserLike;
+    final Color labelColor =
+        dark ? Colors.white.withValues(alpha: 0.88) : CheckpointCardStyle.navy;
+    final Color timeColor = dark
+        ? Colors.white54
+        : CheckpointCardStyle.navy.withValues(alpha: 0.55);
+    final Color noteColor = dark
+        ? Colors.white38
+        : CheckpointCardStyle.navy.withValues(alpha: 0.45);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -172,25 +226,35 @@ class _DirectionColumn extends StatelessWidget {
           textAlign: TextAlign.center,
           style: theme.textTheme.labelLarge?.copyWith(
             fontWeight: FontWeight.w700,
-            color: CheckpointCardStyle.navy,
+            color: labelColor,
           ),
         ),
         const SizedBox(height: 8),
-        Expanded(
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: _StatusBadge(status: status, onTap: onTap),
-          ),
-        ),
+        _StatusBadge(status: status, onTap: onTap),
         const SizedBox(height: 6),
         Text(
           arabicRelativeSince(updatedAt),
           textAlign: TextAlign.center,
           style: theme.textTheme.bodySmall?.copyWith(
             fontWeight: FontWeight.w600,
-            color: CheckpointCardStyle.navy.withValues(alpha: 0.55),
+            color: timeColor,
           ),
         ),
+        if (sourceFootnote != null) ...<Widget>[
+          const SizedBox(height: 3),
+          Text(
+            sourceFootnote!,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodySmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              fontSize: 9.5,
+              height: 1.2,
+              color: noteColor,
+            ),
+          ),
+        ],
       ],
     );
   }

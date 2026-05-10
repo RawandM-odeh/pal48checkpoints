@@ -29,15 +29,30 @@ class _SendNotificationTabState extends State<SendNotificationTab> {
     }
     setState(() => _sending = true);
     try {
-      await context.read<NotificationRepository>().saveNotificationDocument(
-            title: _titleCtrl.text,
-            body: _bodyCtrl.text,
-          );
+      final NotificationRepository repo =
+          context.read<NotificationRepository>();
+      final String docId = await repo.saveNotificationDocument(
+        title: _titleCtrl.text,
+        body: _bodyCtrl.text,
+      );
+      final Map<String, dynamic> sendResult = await repo.sendBroadcastToAllUsers(
+        title: _titleCtrl.text,
+        body: _bodyCtrl.text,
+        broadcastId: docId,
+      );
       if (!mounted) {
         return;
       }
+      final int delivered = (sendResult['delivered'] as num?)?.toInt() ?? 0;
+      final int targets = (sendResult['targets'] as num?)?.toInt() ?? 0;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم إرسال الإشعار')),
+        SnackBar(
+          content: Text(
+            targets == 0
+                ? 'تم الحفظ؛ لا توجد أجهزة مسجّلة لاستلام الإشعار'
+                : 'تم الإرسال إلى $delivered من أصل $targets جهاز',
+          ),
+        ),
       );
       _titleCtrl.clear();
       _bodyCtrl.clear();

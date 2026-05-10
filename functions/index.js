@@ -130,8 +130,16 @@ exports.sendBroadcastNotification = functions.https.onCall(
         );
       }
 
-      const result =
-        await notifyAll(title, body, {type: "broadcast"});
+      const broadcastIdRaw = data.broadcastId;
+      const broadcastId =
+        typeof broadcastIdRaw === "string" ? broadcastIdRaw.trim() : "";
+      /** @type {Record<string, string>} */
+      const payload = {type: "broadcast"};
+      if (broadcastId) {
+        payload.broadcastId = broadcastId;
+      }
+
+      const result = await notifyAll(title, body, payload);
       return {ok: true, delivered: result.successCount, targets: result.total};
     });
 
