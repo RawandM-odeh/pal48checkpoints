@@ -44,8 +44,6 @@ class ReferenceCheckpointTile extends StatelessWidget {
     required this.onDirectionTap,
     this.subtitleMaxLines = 6,
     this.onCardTap,
-    this.isFavorite = false,
-    this.onFavoriteTap,
     this.isSaved = false,
     this.onSavedTap,
   });
@@ -57,12 +55,8 @@ class ReferenceCheckpointTile extends StatelessWidget {
   final int subtitleMaxLines;
   final void Function(String direction) onDirectionTap;
   final VoidCallback? onCardTap;
-  final bool isFavorite;
 
-  /// Async so callers can await [ensureLoggedInForFavorites] before toggling.
-  final Future<void> Function()? onFavoriteTap;
-
-  /// «المثبتة» — متميز عن المفضلة.
+  /// «المثبتة»
   final bool isSaved;
 
   /// Async لتشغيل كاشف تسجيل الدخول قبل التبديل.
@@ -134,32 +128,14 @@ class ReferenceCheckpointTile extends StatelessWidget {
             ),
           );
 
-    final Widget? favoriteButton = onFavoriteTap == null
-        ? null
-        : IconButton(
-            tooltip: 'مفضل',
-            padding: EdgeInsets.zero,
-            visualDensity: VisualDensity.compact,
-            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-            onPressed: () => unawaited(onFavoriteTap!()),
-            icon: Icon(
-              isFavorite ? Icons.favorite : Icons.favorite_border,
-              color:
-                  isFavorite ? const Color(0xFFE11D48) : AppColors.textMutedLight,
-            ),
-          );
-
     final Widget? bookmarksColumn =
-        savedButton != null || favoriteButton != null
+        savedButton != null
         ? Padding(
             padding: EdgeInsets.only(top: compact ? 2 : 0),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                ?savedButton,
-                ?favoriteButton,
-              ],
+              children: <Widget>[savedButton],
             ),
           )
         : null;

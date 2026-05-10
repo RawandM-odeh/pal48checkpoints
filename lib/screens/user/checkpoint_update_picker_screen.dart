@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 
 import '../../models/checkpoint.dart';
 import '../../providers/checkpoint_provider.dart';
-import '../../providers/favorite_checkpoints_provider.dart';
 import '../../providers/saved_checkpoints_provider.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_layout.dart';
@@ -13,20 +12,6 @@ import '../../utils/guest_session.dart';
 import '../widgets/checkpoint_card.dart';
 import '../widgets/reference_checkpoint_tile.dart';
 import 'checkpoint_detail_screen.dart';
-
-Future<void> _toggleFavoriteLoggedInIfAllowed(
-  BuildContext context,
-  FavoriteCheckpointsProvider favorites,
-  String checkpointId,
-) async {
-  if (!await ensureLoggedInForFavorites(context)) {
-    return;
-  }
-  if (!context.mounted) {
-    return;
-  }
-  favorites.toggle(checkpointId);
-}
 
 Future<void> _toggleSavedLoggedInIfAllowed(
   BuildContext context,
@@ -79,8 +64,6 @@ class _CheckpointUpdatePickerScreenState
   @override
   Widget build(BuildContext context) {
     final CheckpointProvider cp = context.watch<CheckpointProvider>();
-    final FavoriteCheckpointsProvider favorites = context
-        .watch<FavoriteCheckpointsProvider>();
     final SavedCheckpointsProvider saved = context.watch<SavedCheckpointsProvider>();
     final ThemeData theme = Theme.of(context);
     final List<Checkpoint> rows = _sortedFiltered(cp.items, _query);
@@ -228,13 +211,6 @@ class _CheckpointUpdatePickerScreenState
                                           saved,
                                           c.id,
                                       ),
-                                  isFavorite: favorites.isFavorite(c.id),
-                                  onFavoriteTap: () =>
-                                      _toggleFavoriteLoggedInIfAllowed(
-                                      context,
-                                      favorites,
-                                      c.id,
-                                    ),
                                   onDirectionTap: (String direction) {
                                     showCheckpointStatusSheet(
                                       context: context,

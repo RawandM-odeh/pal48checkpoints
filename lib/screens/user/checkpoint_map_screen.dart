@@ -8,11 +8,12 @@ import 'package:latlong2/latlong.dart';
 
 import '../../models/checkpoint.dart';
 import '../../providers/checkpoint_provider.dart';
-import '../../providers/favorite_checkpoints_provider.dart';
 import '../../providers/saved_checkpoints_provider.dart';
 import '../../theme/app_colors.dart';
 import '../../utils/ar_relative_time.dart';
 import '../../utils/city_display_ar.dart';
+import '../../utils/geo_distance.dart';
+import '../../utils/request_device_position.dart';
 import '../../utils/guest_session.dart';
 import '../widgets/checkpoint_card.dart';
 import '../widgets/split_checkpoint_pin.dart';
@@ -26,6 +27,9 @@ abstract final class _OsmTiles {
 abstract final class _MapSeed {
   static final LatLng palestine = LatLng(31.9522, 35.2332);
   static const double initialZoom = 8.6;
+  static const double minZoom = 4;
+  static const double maxZoom = 19;
+  static const double zoomStep = 1;
 }
 
 /// خريطة OpenStreetMap عبر [flutter_map] — بدون Google Maps API أو فوترة Google.
@@ -36,10 +40,24 @@ class CheckpointMapScreen extends StatefulWidget {
   State<CheckpointMapScreen> createState() => _CheckpointMapScreenState();
 }
 
+abstract final class _NearbyMapUi {
+  static const int sheetMaxRows = 20;
+}
+
+class _NearRowCp {
+  const _NearRowCp({required this.checkpoint, required this.distanceKm});
+  final Checkpoint checkpoint;
+  final double distanceKm;
+}
+
 class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
   final MapController _mapController = MapController();
   String _markerSignature = '';
   String _lastFitSignature = '';
+
+  LatLng? _userMapPoint;
+
+  bool _resolvingLocation = false;
 
   /// مفتاح تطبيع للمدينة من حقل [Checkpoint.location] — للتجميع وتجنّب التكرار الكاسِر.
   static String _cityKey(Checkpoint c) {
@@ -82,6 +100,261 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
   static String _selectionToken(Set<String> keys) {
     final List<String> sorted = keys.toList(growable: false)..sort();
     return sorted.join(',');
+  }
+
+  /// المرشّح المعروض على الخريطة؛ إذا لم يُختر أي مدينة نستخدم كل الحواجز ذات الإحداثيات (للمسافة).
+  List<Checkpoint> _nearbyCandidates(List<Checkpoint> withCoords) {
+    final List<Checkpoint> fromFilter =
+        withCoords.where((Checkpoint c) => _selectedCityKeys.contains(_cityKey(c))).toList(growable: false);
+    return fromFilter.isEmpty
+        ? List<Checkpoint>.from(withCoords)
+        : fromFilter;
+  }
+
+  String _formatKmAr(double km) {
+    const double epsilon = 0.05;
+    if (km < epsilon) {
+      return 'بالقرب جدًا';
+    }
+    if (km < 10) {
+      return '${km.toStringAsFixed(1)} كم';
+    }
+    return '${km.round()} كم';
+  }
+
+  void _presentLocationFailure(BuildContext scaffoldContext, DeviceLocationFailureKind kind) {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(scaffoldContext);
+    final SnackBarAction? action = switch (kind) {
+      DeviceLocationFailureKind.serviceDisabled => SnackBarAction(
+          label: 'إعدادات الموقع',
+          onPressed: () => unawaited(Geolocator.openLocationSettings()),
+        ),
+      DeviceLocationFailureKind.permissionDeniedForever => SnackBarAction(
+          label: 'إعدادات التطبيق',
+          onPressed: () => unawaited(Geolocator.openAppSettings()),
+        ),
+      DeviceLocationFailureKind.permissionDenied => SnackBarAction(
+          label: 'إعادة الطلب',
+          onPressed: () {
+            _goToMyLocation();
+          },
+        ),
+      DeviceLocationFailureKind.unavailable => null,
+    };
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(kind.descriptionAr),
+        behavior: SnackBarBehavior.floating,
+        action: action,
+      ),
+    );
+  }
+
+  void _showNearbyCheckpointsSheet(
+    BuildContext hostContext,
+    LatLng user,
+    List<Checkpoint> source,
+  ) {
+    if (source.isEmpty) {
+      ScaffoldMessenger.of(hostContext).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(
+            'لا توجد حواجز بإحداثيات لمسافتها منك أو لم تُحمَّل بعد.',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+      return;
+    }
+
+    final List<_NearRowCp> ranked = source
+        .map(
+          (Checkpoint c) => _NearRowCp(
+            checkpoint: c,
+            distanceKm: haversineKm(
+              user.latitude,
+              user.longitude,
+              c.latitude!,
+              c.longitude!,
+            ),
+          ),
+        )
+        .toList(growable: false)
+      ..sort((_NearRowCp a, _NearRowCp b) => a.distanceKm.compareTo(b.distanceKm));
+
+    final List<_NearRowCp> trimmed = ranked
+        .take(_NearbyMapUi.sheetMaxRows)
+        .toList(growable: false);
+
+    showModalBottomSheet<void>(
+      context: hostContext,
+      backgroundColor: AppColors.cardLight,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (BuildContext bc) {
+        return Directionality(
+          textDirection: TextDirection.rtl,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(16, 4, 16, 16 + MediaQuery.paddingOf(bc).bottom),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Text(
+                  'أقرب الحواجز من موقعك',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(bc).textTheme.titleMedium?.copyWith(
+                        color: AppColors.textPrimaryLight,
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.sizeOf(bc).height * 0.55,
+                  ),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: trimmed.length,
+                    separatorBuilder: (_, _) =>
+                        Divider(height: 1, color: AppColors.borderSubtleLight.withValues(alpha: 0.6)),
+                    itemBuilder: (BuildContext _, int i) {
+                      final _NearRowCp row = trimmed[i];
+                      final Checkpoint c = row.checkpoint;
+                      final String subtitle = _formatKmAr(row.distanceKm);
+                      return ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                        leading: SizedBox(
+                          width: 32,
+                          child: Align(
+                            child: SplitCheckpointPin(
+                              entranceStatus: c.entranceStatus,
+                              exitStatus: c.exitStatus,
+                              size: 24,
+                            ),
+                          ),
+                        ),
+                        title: Text(
+                          c.name.isEmpty ? 'بدون اسم' : c.name,
+                          style: const TextStyle(
+                            color: AppColors.textPrimaryLight,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        subtitle: Text.rich(
+                          TextSpan(
+                            children: <InlineSpan>[
+                              TextSpan(text: subtitle, style: TextStyle(fontWeight: FontWeight.w700, color: Colors.blue.shade800)),
+                              if (c.location.trim().isNotEmpty)
+                                TextSpan(
+                                  text: ' · ${cityDisplayNameAr(c.location.trim())}',
+                                  style: Theme.of(bc).textTheme.bodySmall?.copyWith(
+                                        color: AppColors.textMutedLight,
+                                      ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        onTap: () {
+                          Navigator.of(bc).pop();
+                          _mapController.move(LatLng(c.latitude!, c.longitude!), 14);
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (mounted) {
+                              unawaited(_showCheckpointSheet(hostContext, c));
+                            }
+                          });
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _goToMyLocation() async {
+    if (_resolvingLocation) {
+      return;
+    }
+    setState(() => _resolvingLocation = true);
+    try {
+      final DeviceLocationResult result = await requestDeviceLocation();
+      if (!mounted) {
+        return;
+      }
+      final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+
+      if (!result.isSuccess) {
+        _presentLocationFailure(context, result.failureKind!);
+        return;
+      }
+
+      final Position pos = result.position!;
+      final LatLng ll = LatLng(pos.latitude, pos.longitude);
+
+      setState(() => _userMapPoint = ll);
+      _mapController.move(ll, 14);
+
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: const Text('تم تحديد موقعك على الخريطة.'),
+          action: SnackBarAction(
+            label: 'الأقرب',
+            onPressed: () {
+              final CheckpointProvider cp = context.read<CheckpointProvider>();
+              final List<Checkpoint> coords = cp.items
+                  .where((Checkpoint c) => c.hasCoordinates)
+                  .toList(growable: false);
+              _showNearbyCheckpointsSheet(context, ll, _nearbyCandidates(coords));
+            },
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _resolvingLocation = false);
+      }
+    }
+  }
+
+  void _nudgeZoom(double delta) {
+    try {
+      final MapCamera cam = _mapController.camera;
+      final double z = (cam.zoom + delta).clamp(
+        _MapSeed.minZoom,
+        _MapSeed.maxZoom,
+      );
+      if ((z - cam.zoom).abs() < 1e-6) {
+        return;
+      }
+      _mapController.move(cam.center, z);
+    } catch (_) {
+      // قبل اكتمال تهيئة الخريطة
+    }
+  }
+
+  void _onNearbyFabPressed(BuildContext scaffoldContext, List<Checkpoint> withCoords) {
+    final LatLng? u = _userMapPoint;
+    if (u == null) {
+      ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          content: Text(
+            'اضغط «موقعي» أولًا ليقرأ التطبيق GPS ويحدِّد مكانك.',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      );
+      return;
+    }
+    _showNearbyCheckpointsSheet(scaffoldContext, u, _nearbyCandidates(withCoords));
   }
 
   void _scheduleFitCamera(List<Checkpoint> items) {
@@ -254,45 +527,10 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
     );
   }
 
-  Future<void> _goToMyLocation() async {
-    try {
-      LocationPermission perm = await Geolocator.checkPermission();
-      if (perm == LocationPermission.denied) {
-        perm = await Geolocator.requestPermission();
-      }
-      final Position pos = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.medium,
-        ),
-      );
-      _mapController.move(LatLng(pos.latitude, pos.longitude), 13);
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('تعذّر تحديد موقعك')));
-      }
-    }
-  }
-
   @override
   void dispose() {
     _mapController.dispose();
     super.dispose();
-  }
-
-  Future<void> _toggleMapCheckpointFavorite(
-    BuildContext hostContext,
-    FavoriteCheckpointsProvider fv,
-    Checkpoint checkpoint,
-  ) async {
-    if (!await ensureLoggedInForFavorites(hostContext)) {
-      return;
-    }
-    if (!hostContext.mounted) {
-      return;
-    }
-    fv.toggle(checkpoint.id);
   }
 
   Future<void> _toggleMapCheckpointSaved(
@@ -324,11 +562,9 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
               20,
               16 + MediaQuery.paddingOf(bc).bottom,
             ),
-            child: Consumer2<FavoriteCheckpointsProvider,
-                SavedCheckpointsProvider>(
+            child: Consumer<SavedCheckpointsProvider>(
               builder: (
                 BuildContext _,
-                FavoriteCheckpointsProvider fv,
                 SavedCheckpointsProvider sv,
                 Widget? child,
               ) {
@@ -340,30 +576,6 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       textDirection: TextDirection.rtl,
                       children: <Widget>[
-                        IconButton(
-                          tooltip: 'مفضل',
-                          onPressed: () => unawaited(
-                            _toggleMapCheckpointFavorite(context, fv, c),
-                          ),
-                          icon: Icon(
-                            fv.isFavorite(c.id)
-                                ? Icons.favorite
-                                : Icons.favorite_border,
-                            color: fv.isFavorite(c.id)
-                                ? const Color(0xFFE11D48)
-                                : AppColors.textMutedLight,
-                          ),
-                        ),
-                        Expanded(
-                          child: Text(
-                            c.name.isEmpty ? 'بدون اسم' : c.name,
-                            textAlign: TextAlign.center,
-                            style: Theme.of(bc).textTheme.titleLarge?.copyWith(
-                                  color: AppColors.textPrimaryLight,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                          ),
-                        ),
                         IconButton(
                           tooltip: 'مثبتة',
                           onPressed: () => unawaited(
@@ -378,6 +590,17 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
                                 : AppColors.textMutedLight,
                           ),
                         ),
+                        Expanded(
+                          child: Text(
+                            c.name.isEmpty ? 'بدون اسم' : c.name,
+                            textAlign: TextAlign.center,
+                            style: Theme.of(bc).textTheme.titleLarge?.copyWith(
+                                  color: AppColors.textPrimaryLight,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
+                        ),
+                        const SizedBox(width: 48, height: 48),
                       ],
                     ),
                     if (c.location.trim().isNotEmpty) ...<Widget>[
@@ -460,24 +683,43 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
       _scheduleFitCamera(filtered);
     }
 
-    final List<Marker> markers = filtered
-        .map(
-          (Checkpoint c) => Marker(
-            point: LatLng(c.latitude!, c.longitude!),
-            width: 32,
-            height: 32,
-            alignment: Alignment.center,
-            child: GestureDetector(
-              onTap: () => _showCheckpointSheet(context, c),
-              child: SplitCheckpointPin(
-                entranceStatus: c.entranceStatus,
-                exitStatus: c.exitStatus,
-                size: 28,
-              ),
+    final LatLng? userPoint = _userMapPoint;
+    final List<Marker> markers = <Marker>[
+      ...filtered.map(
+        (Checkpoint c) => Marker(
+          point: LatLng(c.latitude!, c.longitude!),
+          width: 32,
+          height: 32,
+          alignment: Alignment.center,
+          child: GestureDetector(
+            onTap: () => _showCheckpointSheet(context, c),
+            child: SplitCheckpointPin(
+              entranceStatus: c.entranceStatus,
+              exitStatus: c.exitStatus,
+              size: 28,
             ),
           ),
-        )
-        .toList(growable: false);
+        ),
+      ),
+      if (userPoint != null)
+        Marker(
+          point: userPoint,
+          width: 40,
+          height: 40,
+          alignment: Alignment.center,
+          child: Icon(
+            Icons.navigation_rounded,
+            size: 36,
+            color: const Color(0xFF1565C0),
+            shadows: <Shadow>[
+              Shadow(
+                color: Colors.white.withValues(alpha: 0.92),
+                blurRadius: 8,
+              ),
+            ],
+          ),
+        ),
+    ];
 
     final bool hasCoords = withCoords.isNotEmpty;
     final bool needsCityPick = hasCoords && _selectedCityKeys.isEmpty;
@@ -490,6 +732,8 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
           options: MapOptions(
             initialCenter: _MapSeed.palestine,
             initialZoom: _MapSeed.initialZoom,
+            minZoom: _MapSeed.minZoom,
+            maxZoom: _MapSeed.maxZoom,
             interactionOptions: const InteractionOptions(
               flags: InteractiveFlag.all,
             ),
@@ -587,18 +831,73 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
         Positioned(
           left: 12,
           bottom: 96,
-          child: Material(
-            color: AppColors.cardLight,
-            elevation: 3,
-            shadowColor: AppColors.brandTeal.withValues(alpha: 0.18),
-            surfaceTintColor: Colors.transparent,
-            shape: const CircleBorder(),
-            clipBehavior: Clip.antiAlias,
-            child: IconButton(
-              tooltip: 'موقعي',
-              onPressed: _goToMyLocation,
-              icon: const Icon(Icons.my_location, color: AppColors.brandTeal),
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Material(
+                color: AppColors.cardLight,
+                elevation: 2,
+                shadowColor: AppColors.brandTeal.withValues(alpha: 0.12),
+                surfaceTintColor: Colors.transparent,
+                shape: const CircleBorder(),
+                clipBehavior: Clip.antiAlias,
+                child: IconButton(
+                  tooltip: 'تكبير',
+                  onPressed: () => _nudgeZoom(_MapSeed.zoomStep),
+                  icon: const Icon(Icons.add_rounded, color: AppColors.brandTeal),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Material(
+                color: AppColors.cardLight,
+                elevation: 2,
+                shadowColor: AppColors.brandTeal.withValues(alpha: 0.12),
+                surfaceTintColor: Colors.transparent,
+                shape: const CircleBorder(),
+                clipBehavior: Clip.antiAlias,
+                child: IconButton(
+                  tooltip: 'تصغير',
+                  onPressed: () => _nudgeZoom(-_MapSeed.zoomStep),
+                  icon: const Icon(Icons.remove_rounded, color: AppColors.brandTeal),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Material(
+                color: AppColors.cardLight,
+                elevation: 2,
+                shadowColor: AppColors.brandTeal.withValues(alpha: 0.14),
+                surfaceTintColor: Colors.transparent,
+                shape: const CircleBorder(),
+                clipBehavior: Clip.antiAlias,
+                child: IconButton(
+                  tooltip: 'الحواجز القريبة',
+                  onPressed: () => _onNearbyFabPressed(context, withCoords),
+                  icon: const Icon(Icons.near_me_rounded, color: AppColors.brandTeal),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Material(
+                color: AppColors.cardLight,
+                elevation: 3,
+                shadowColor: AppColors.brandTeal.withValues(alpha: 0.18),
+                surfaceTintColor: Colors.transparent,
+                shape: const CircleBorder(),
+                clipBehavior: Clip.antiAlias,
+                child: IconButton(
+                  tooltip: 'موقعي',
+                  onPressed: _resolvingLocation ? null : _goToMyLocation,
+                  icon: _resolvingLocation
+                      ? SizedBox.square(
+                          dimension: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.brandTealDark,
+                          ),
+                        )
+                      : const Icon(Icons.my_location, color: AppColors.brandTeal),
+                ),
+              ),
+            ],
           ),
         ),
         Positioned(
