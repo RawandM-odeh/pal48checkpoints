@@ -13,11 +13,9 @@ double haversineKm(
   final double dLat = (lat2Deg - lat1Deg) * math.pi / 180;
   final double dLon = (lon2Deg - lon1Deg) * math.pi / 180;
 
-  final double a = math.sin(dLat / 2) * math.sin(dLat / 2) +
-      math.cos(p1) *
-          math.cos(p2) *
-          math.sin(dLon / 2) *
-          math.sin(dLon / 2);
+  final double a =
+      math.sin(dLat / 2) * math.sin(dLat / 2) +
+      math.cos(p1) * math.cos(p2) * math.sin(dLon / 2) * math.sin(dLon / 2);
   final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
   return earthKm * c;
 }

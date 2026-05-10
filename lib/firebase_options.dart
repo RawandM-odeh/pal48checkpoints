@@ -85,5 +85,4 @@ class DefaultFirebaseOptions {
     projectId: 'pal48checkpoint',
     storageBucket: 'pal48checkpoint.firebasestorage.app',
   );
-
 }

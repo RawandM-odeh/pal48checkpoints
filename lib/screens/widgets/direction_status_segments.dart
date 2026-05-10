@@ -15,8 +15,7 @@ class DirectionStatusSegments extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String normalized =
-        CheckpointStatus.normalize(selected);
+    final String normalized = CheckpointStatus.normalize(selected);
 
     return SegmentedButton<String>(
       showSelectedIcon: false,
@@ -27,7 +26,10 @@ class DirectionStatusSegments extends StatelessWidget {
             (String s) => ButtonSegment<String>(
               value: s,
               label: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 2),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 10,
+                  horizontal: 2,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   mainAxisSize: MainAxisSize.min,

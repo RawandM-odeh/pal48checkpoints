@@ -19,17 +19,17 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 abstract final class NotificationService {
   static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
-  static final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
+  static final FlutterLocalNotificationsPlugin
+  _flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
   /// Must match AndroidManifest meta-data channel id & created channel below.
   static const AndroidNotificationChannel _androidChannel =
       AndroidNotificationChannel(
-    'high_importance_channel',
-    'Important notifications',
-    description: 'تنبيهات نقاط التفتيش',
-    importance: Importance.high,
-  );
+        'high_importance_channel',
+        'Important notifications',
+        description: 'تنبيهات نقاط التفتيش',
+        importance: Importance.high,
+      );
 
   static int _notificationId = 1;
 
@@ -45,11 +45,13 @@ abstract final class NotificationService {
 
       FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
         final RemoteNotification? n = message.notification;
-        final String title = n?.title ??
+        final String title =
+            n?.title ??
             message.data['title'] as String? ??
             message.data['gcm.notification.title'] as String? ??
             'تحديث';
-        final String body = n?.body ??
+        final String body =
+            n?.body ??
             message.data['body'] as String? ??
             message.data['gcm.notification.body'] as String? ??
             '';
@@ -84,10 +86,7 @@ abstract final class NotificationService {
         }
         final RemoteNotification? n = m.notification;
         if (n != null) {
-          inbox.addForegroundLine(
-            n.title ?? 'رسالة مفتوحة',
-            n.body ?? '',
-          );
+          inbox.addForegroundLine(n.title ?? 'رسالة مفتوحة', n.body ?? '');
         }
       });
     }
@@ -95,8 +94,10 @@ abstract final class NotificationService {
 
   static Future<void> _configureLocalNotifications() async {
     final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
-        _flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
+        _flutterLocalNotificationsPlugin
+            .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin
+            >();
     await androidImplementation?.createNotificationChannel(_androidChannel);
 
     await _flutterLocalNotificationsPlugin.initialize(
@@ -110,14 +111,13 @@ abstract final class NotificationService {
       ),
       onDidReceiveNotificationResponse:
           (NotificationResponse notificationResponse) {
-        // Optionally handle tap payloads later.
-      },
+            // Optionally handle tap payloads later.
+          },
     );
   }
 
   static Future<void> _requestPermissions() async {
-    final NotificationSettings settings =
-        await _messaging.requestPermission(
+    final NotificationSettings settings = await _messaging.requestPermission(
       announcement: false,
       carPlay: false,
       criticalAlert: false,
@@ -130,15 +130,14 @@ abstract final class NotificationService {
 
     await _flutterLocalNotificationsPlugin
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.requestNotificationsPermission();
   }
 
   static Future<void> _persistInitialTokenIfSignedIn() async {
     final User? user = FirebaseAuth.instance.currentUser;
-    if (user != null &&
-        !user.isAnonymous &&
-        user.uid.isNotEmpty) {
+    if (user != null && !user.isAnonymous && user.uid.isNotEmpty) {
       await _persistTokenForUid(user.uid);
     }
   }
@@ -157,9 +156,9 @@ abstract final class NotificationService {
   static Future<void> _writeFcmToken(String uid, String token) async {
     try {
       await FirebaseFirestore.instance.collection('users').doc(uid).set(
-            <String, dynamic>{'fcmToken': token},
-            SetOptions(merge: true),
-          );
+        <String, dynamic>{'fcmToken': token},
+        SetOptions(merge: true),
+      );
     } catch (e, st) {
       debugPrint('[FCM] write token to Firestore failed: $e\n$st');
     }
@@ -172,12 +171,12 @@ abstract final class NotificationService {
   ) async {
     final AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
-      _androidChannel.id,
-      _androidChannel.name,
-      channelDescription: _androidChannel.description,
-      importance: Importance.max,
-      priority: Priority.high,
-    );
+          _androidChannel.id,
+          _androidChannel.name,
+          channelDescription: _androidChannel.description,
+          importance: Importance.max,
+          priority: Priority.high,
+        );
     const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,

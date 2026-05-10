@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../models/checkpoint.dart';
@@ -39,6 +41,8 @@ class ReferenceCheckpointTile extends StatelessWidget {
     required this.subtitle,
     required this.onDirectionTap,
     this.onCardTap,
+    this.isFavorite = false,
+    this.onFavoriteTap,
   });
 
   final Checkpoint checkpoint;
@@ -47,10 +51,67 @@ class ReferenceCheckpointTile extends StatelessWidget {
   final String subtitle;
   final void Function(String direction) onDirectionTap;
   final VoidCallback? onCardTap;
+  final bool isFavorite;
+
+  /// Async so callers can await [ensureLoggedInForFavorites] before toggling.
+  final Future<void> Function()? onFavoriteTap;
 
   @override
   Widget build(BuildContext context) {
     final double pad = compact ? 10 : 12;
+    final Widget textColumn = Padding(
+      padding: EdgeInsets.fromLTRB(pad + 4, pad, 10, pad),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            checkpoint.name.isEmpty ? 'بدون اسم' : checkpoint.name,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: AppColors.textPrimaryLight,
+              fontWeight: FontWeight.w800,
+              fontSize: compact ? 15 : 16,
+            ),
+          ),
+          if (checkpoint.location.trim().isNotEmpty) ...<Widget>[
+            SizedBox(height: compact ? 2 : 4),
+            Text(
+              checkpoint.location.trim(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: AppColors.textMutedLight,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+          SizedBox(height: compact ? 4 : 6),
+          Text(
+            subtitle,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: AppColors.textMutedLight,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    final Widget favoriteButton = IconButton(
+      tooltip: 'مفضل',
+      padding: EdgeInsets.zero,
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+      onPressed: onFavoriteTap == null
+          ? null
+          : () => unawaited(onFavoriteTap!()),
+      icon: Icon(
+        isFavorite ? Icons.favorite : Icons.favorite_border,
+        color: isFavorite ? const Color(0xFFE11D48) : AppColors.textMutedLight,
+      ),
+    );
+
     final Widget row = IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -58,47 +119,24 @@ class ReferenceCheckpointTile extends StatelessWidget {
         children: <Widget>[
           Container(width: compact ? 4 : 5, color: stripColor),
           Expanded(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(pad + 4, pad, 10, pad),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    checkpoint.name.isEmpty ? 'بدون اسم' : checkpoint.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: AppColors.textPrimaryLight,
-                          fontWeight: FontWeight.w800,
-                          fontSize: compact ? 15 : 16,
-                        ),
+            child: onCardTap == null
+                ? textColumn
+                : InkWell(
+                    onTap: onCardTap,
+                    borderRadius: BorderRadius.circular(16),
+                    child: textColumn,
                   ),
-                  if (checkpoint.location.trim().isNotEmpty) ...<Widget>[
-                    SizedBox(height: compact ? 2 : 4),
-                    Text(
-                      checkpoint.location.trim(),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.textMutedLight,
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                  ],
-                  SizedBox(height: compact ? 4 : 6),
-                  Text(
-                    subtitle,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.textMutedLight,
-                          fontWeight: FontWeight.w500,
-                        ),
-                  ),
-                ],
+          ),
+          if (onFavoriteTap != null)
+            Align(
+              alignment: Alignment.center,
+              child: Padding(
+                padding: EdgeInsets.only(top: compact ? 2 : 0),
+                child: favoriteButton,
               ),
             ),
-          ),
           Padding(
-            padding: EdgeInsets.fromLTRB(8, pad, pad, pad),
+            padding: EdgeInsets.fromLTRB(4, pad, pad, pad),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.center,
@@ -134,13 +172,7 @@ class ReferenceCheckpointTile extends StatelessWidget {
       surfaceTintColor: Colors.transparent,
       shape: shape,
       clipBehavior: Clip.antiAlias,
-      child: onCardTap == null
-          ? row
-          : InkWell(
-              onTap: onCardTap,
-              borderRadius: BorderRadius.circular(16),
-              child: row,
-            ),
+      child: row,
     );
   }
 }
@@ -158,9 +190,7 @@ class _InboundOutboundBadge extends StatelessWidget {
   final bool compact;
   final VoidCallback onTap;
 
-  static ({Color bg, Color fg, IconData icon, String text}) _style(
-    String raw,
-  ) {
+  static ({Color bg, Color fg, IconData icon, String text}) _style(String raw) {
     final String s = CheckpointStatus.normalize(raw);
     if (s == CheckpointStatus.closed) {
       return (
@@ -204,8 +234,9 @@ class _InboundOutboundBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ({Color bg, Color fg, IconData icon, String text}) styl =
-        _style(status);
+    final ({Color bg, Color fg, IconData icon, String text}) styl = _style(
+      status,
+    );
     final double hPad = compact ? 8 : 10;
     final double vPad = compact ? 6 : 8;
     return Column(
@@ -215,9 +246,9 @@ class _InboundOutboundBadge extends StatelessWidget {
         Text(
           label,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: AppColors.textMutedLight,
-                fontWeight: FontWeight.w700,
-              ),
+            color: AppColors.textMutedLight,
+            fontWeight: FontWeight.w700,
+          ),
         ),
         const SizedBox(height: 4),
         Material(
@@ -227,10 +258,7 @@ class _InboundOutboundBadge extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             child: Container(
               constraints: const BoxConstraints(minWidth: 104),
-              padding: EdgeInsets.symmetric(
-                horizontal: hPad,
-                vertical: vPad,
-              ),
+              padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
               decoration: BoxDecoration(
                 color: styl.bg,
                 borderRadius: BorderRadius.circular(12),

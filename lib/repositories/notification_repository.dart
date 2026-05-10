@@ -5,8 +5,8 @@ class NotificationRepository {
   NotificationRepository({
     FirebaseFirestore? firestore,
     FirebaseFunctions? functions,
-  })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _functions = functions ?? FirebaseFunctions.instance;
+  }) : _firestore = firestore ?? FirebaseFirestore.instance,
+       _functions = functions ?? FirebaseFunctions.instance;
 
   final FirebaseFirestore _firestore;
   final FirebaseFunctions _functions;
@@ -28,8 +28,9 @@ class NotificationRepository {
     required String title,
     required String body,
   }) async {
-    final HttpsCallable callable =
-        _functions.httpsCallable('sendBroadcastNotification');
+    final HttpsCallable callable = _functions.httpsCallable(
+      'sendBroadcastNotification',
+    );
     await callable.call<Map<String, dynamic>>(<String, dynamic>{
       'title': title.trim(),
       'body': body.trim(),

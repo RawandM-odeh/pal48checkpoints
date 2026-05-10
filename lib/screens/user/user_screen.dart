@@ -1,7 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../config/nearby_config.dart';
 import '../../providers/guest_browse_provider.dart';
 import '../../models/checkpoint.dart';
 import '../../providers/checkpoint_provider.dart';
@@ -9,8 +10,10 @@ import '../../providers/notification_provider.dart';
 import '../../providers/user_location_provider.dart';
 import '../../services/auth_service.dart';
 import '../../theme/app_colors.dart';
+import '../../utils/guest_session.dart';
 import 'checkpoint_list.dart';
 import 'checkpoint_map_screen.dart';
+import 'favorites_screen.dart';
 
 /// هيدر تركوزي + هيكل فاتح ناعم.
 abstract final class _PalUi {
@@ -26,16 +29,39 @@ class UserScreen extends StatefulWidget {
   State<UserScreen> createState() => _UserScreenState();
 }
 
-class _UserScreenState extends State<UserScreen> {
+class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
   int _bottomNavIndex = 0;
   int _mainTab = 0;
   String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
   bool _compactCards = false;
   bool _pinnedFilter = false;
+
   /// عرض «أقرب الحواجز» يعتمد على GPS؛ الافتراضي عرض كل الحواجز حسب المدينة.
   bool _nearestListMode = false;
   String? _cityFilter;
   bool _promoVisible = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed && mounted && _nearestListMode) {
+      context.read<UserLocationProvider>().resolve();
+    }
+  }
 
   ThemeData _lightUserTheme(BuildContext base) {
     final ColorScheme scheme = ColorScheme.fromSeed(
@@ -71,14 +97,21 @@ class _UserScreenState extends State<UserScreen> {
     );
   }
 
-  Future<void> _openSearchDialog() async {
-    final String? q = await showDialog<String>(
-      context: context,
-      builder: (_) => const _CheckpointSearchDialog(),
-    );
-    if (q != null && mounted) {
-      setState(() => _searchQuery = q);
+  Future<void> _openFavoritesIfAllowed() async {
+    if (!await ensureLoggedInForFavorites(context)) {
+      return;
     }
+    if (!mounted) {
+      return;
+    }
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const FavoritesScreen()),
+    );
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    setState(() => _searchQuery = '');
   }
 
   void _showCityPicker(List<String> cities) {
@@ -138,6 +171,7 @@ class _UserScreenState extends State<UserScreen> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         _BlueHeader(
+          onFavoritesPressed: () => unawaited(_openFavoritesIfAllowed()),
           onMenuPressed: () async {
             await showModalBottomSheet<void>(
               context: context,
@@ -178,40 +212,124 @@ class _UserScreenState extends State<UserScreen> {
             onChanged: (int i) => setState(() => _mainTab = i),
           ),
         ),
-        _FilterStrip(
-          cityLabel: _cityFilter ?? 'اختر مدينة',
-          pinnedOn: _pinnedFilter,
-          closestOn: _nearestListMode,
-          compactOn: _compactCards,
-          onCityTap: () => _showCityPicker(cities),
-          onPinnedTap: () {
-            setState(() => _pinnedFilter = !_pinnedFilter);
-            if (_pinnedFilter && mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('المثبتة: قريباً')),
-              );
-            }
-          },
-          onClosestTap: () {
-            setState(() {
-              _nearestListMode = !_nearestListMode;
-            });
-            if (_nearestListMode && mounted) {
-              context.read<UserLocationProvider>().resolve();
-            }
-          },
-          onCompactTap: () =>
-              setState(() => _compactCards = !_compactCards),
-        ),
+        if (_mainTab == 0)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: <Widget>[
+                Expanded(
+                  flex: 10,
+                  child: ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: _searchController,
+                    builder: (_, TextEditingValue v, _) {
+                      return Material(
+                        color: AppColors.cardLight,
+                        elevation: 1,
+                        surfaceTintColor: Colors.transparent,
+                        shadowColor: Colors.black.withValues(alpha: 0.06),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(999),
+                          side: const BorderSide(
+                            color: AppColors.borderSubtleLight,
+                          ),
+                        ),
+                        child: TextField(
+                          controller: _searchController,
+                          textAlign: TextAlign.right,
+                          textInputAction: TextInputAction.search,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(fontSize: 14.5),
+                          onChanged: (String s) =>
+                              setState(() => _searchQuery = s),
+                          decoration: InputDecoration(
+                            isDense: true,
+                            border: InputBorder.none,
+                            hintText: 'بحث بالاسم أو الحالة…',
+                            hintStyle: TextStyle(
+                              color: AppColors.textMutedLight
+                                  .withValues(alpha: 0.92),
+                              fontSize: 14,
+                            ),
+                            prefixIcon: Icon(
+                              Icons.search_rounded,
+                              color: AppColors.textMutedLight,
+                              size: 21,
+                            ),
+                            suffixIcon: v.text.isNotEmpty
+                                ? IconButton(
+                                    tooltip: 'مسح',
+                                    visualDensity: VisualDensity.compact,
+                                    onPressed: _clearSearch,
+                                    icon: Icon(
+                                      Icons.close_rounded,
+                                      color: AppColors.textMutedLight,
+                                      size: 20,
+                                    ),
+                                  )
+                                : null,
+                            contentPadding:
+                                const EdgeInsetsDirectional.only(
+                              start: 4,
+                              end: 4,
+                              top: 10,
+                              bottom: 10,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 14,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: _FilterChipsRow(
+                      cityLabel: _cityFilter ?? 'اختر مدينة',
+                      pinnedOn: _pinnedFilter,
+                      closestOn: _nearestListMode,
+                      compactOn: _compactCards,
+                      onCityTap: () => _showCityPicker(cities),
+                      onPinnedTap: () {
+                        setState(() => _pinnedFilter = !_pinnedFilter);
+                        if (_pinnedFilter && mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text('المثبتة: قريباً')),
+                          );
+                        }
+                      },
+                      onClosestTap: () {
+                        final bool next = !_nearestListMode;
+                        setState(() => _nearestListMode = next);
+                        final UserLocationProvider loc =
+                            context.read<UserLocationProvider>();
+                        loc.setNearestModeActive(next);
+                        if (next && mounted) {
+                          loc.resolve();
+                        }
+                      },
+                      onCompactTap: () =>
+                          setState(() => _compactCards = !_compactCards),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         Expanded(
           child: _mainTab == 0
               ? CheckpointList(
-                  nearbyRadiusKm: NearbyConfig.radiusKm,
                   nearestMode: _nearestListMode,
                   onNearestModeChanged: (bool enabled) {
                     setState(() => _nearestListMode = enabled);
+                    final UserLocationProvider loc =
+                        context.read<UserLocationProvider>();
+                    loc.setNearestModeActive(enabled);
                     if (enabled && mounted) {
-                      context.read<UserLocationProvider>().resolve();
+                      loc.resolve();
                     }
                   },
                   searchQuery: _searchQuery,
@@ -234,8 +352,8 @@ class _UserScreenState extends State<UserScreen> {
                       'محطات الوقود — قريباً',
                       textAlign: TextAlign.center,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: AppColors.textMutedLight,
-                          ),
+                        color: AppColors.textMutedLight,
+                      ),
                     ),
                   ),
                 ),
@@ -246,7 +364,6 @@ class _UserScreenState extends State<UserScreen> {
               const SnackBar(content: Text('مشاركة تحديث — قريباً')),
             );
           },
-          onSearchTap: _openSearchDialog,
         ),
       ],
     );
@@ -267,9 +384,9 @@ class _UserScreenState extends State<UserScreen> {
             title,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimaryLight,
-                ),
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimaryLight,
+            ),
           ),
         ),
         Expanded(child: body),
@@ -279,8 +396,7 @@ class _UserScreenState extends State<UserScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final NotificationProvider inbox =
-        context.watch<NotificationProvider>();
+    final NotificationProvider inbox = context.watch<NotificationProvider>();
 
     return Theme(
       data: _lightUserTheme(context),
@@ -292,93 +408,103 @@ class _UserScreenState extends State<UserScreen> {
             duration: const Duration(milliseconds: 250),
             child: switch (_bottomNavIndex) {
               0 => KeyedSubtree(
-                  key: const ValueKey<String>('home'),
-                  child: _buildHomeBody(context),
-                ),
+                key: const ValueKey<String>('home'),
+                child: _buildHomeBody(context),
+              ),
               1 => KeyedSubtree(
-                  key: const ValueKey<String>('plan'),
-                  child: _buildSecondaryPane(
-                    'تخطيط',
-                    const CheckpointMapScreen(),
-                  ),
+                key: const ValueKey<String>('plan'),
+                child: _buildSecondaryPane(
+                  'تخطيط',
+                  const CheckpointMapScreen(),
                 ),
+              ),
               2 => KeyedSubtree(
-                  key: const ValueKey<String>('notif'),
-                  child: _buildSecondaryPane(
-                    'الإشعارات',
-                    _NotificationsBody(inbox: inbox),
-                  ),
+                key: const ValueKey<String>('notif'),
+                child: _buildSecondaryPane(
+                  'الإشعارات',
+                  _NotificationsBody(inbox: inbox),
                 ),
+              ),
               _ => KeyedSubtree(
-                  key: const ValueKey<String>('settings'),
-                  child: _buildSecondaryPane(
-                    'الإعدادات',
-                    ListView(
-                      padding: const EdgeInsets.all(16),
-                      children: <Widget>[
-                        ListTile(
-                          leading: const Icon(Icons.notifications_outlined),
-                          title: const Text('مسح سجل المعاينة'),
-                          subtitle: Text(
-                            inbox.entries.isEmpty
-                                ? 'لا توجد عناصر'
-                                : '${inbox.entries.length} سطر',
-                          ),
-                          onTap: inbox.entries.isEmpty
-                              ? null
-                              : () {
-                                  context.read<NotificationProvider>().clear();
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('تم المسح')),
-                                  );
-                                },
+                key: const ValueKey<String>('settings'),
+                child: _buildSecondaryPane(
+                  'الإعدادات',
+                  ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: <Widget>[
+                      ListTile(
+                        leading: const Icon(Icons.notifications_outlined),
+                        title: const Text('مسح سجل المعاينة'),
+                        subtitle: Text(
+                          inbox.entries.isEmpty
+                              ? 'لا توجد عناصر'
+                              : '${inbox.entries.length} سطر',
                         ),
-                        ListTile(
-                          leading: const Icon(Icons.logout),
-                          title: const Text('تسجيل الخروج'),
-                          onTap: () async {
-                            await AuthService().signOut();
-                            if (context.mounted) {
-                              await context
-                                  .read<GuestBrowseProvider>()
-                                  .exitGuestBrowse();
-                            }
-                          },
-                        ),
-                      ],
-                    ),
+                        onTap: inbox.entries.isEmpty
+                            ? null
+                            : () {
+                                context.read<NotificationProvider>().clear();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('تم المسح')),
+                                );
+                              },
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.logout),
+                        title: const Text('تسجيل الخروج'),
+                        onTap: () async {
+                          await AuthService().signOut();
+                          if (context.mounted) {
+                            await context
+                                .read<GuestBrowseProvider>()
+                                .exitGuestBrowse();
+                          }
+                        },
+                      ),
+                    ],
                   ),
                 ),
+              ),
             },
           ),
           bottomNavigationBar: NavigationBar(
             selectedIndex: _bottomNavIndex,
             height: 72,
-            onDestinationSelected: (int i) =>
-                setState(() => _bottomNavIndex = i),
+            onDestinationSelected: (int i) {
+              final int prev = _bottomNavIndex;
+              setState(() => _bottomNavIndex = i);
+              if (i == 0 && prev != 0 && mounted && _nearestListMode) {
+                context.read<UserLocationProvider>().resolve();
+              }
+            },
             destinations: <NavigationDestination>[
               NavigationDestination(
                 icon: const Icon(Icons.home_outlined),
-                selectedIcon:
-                    const Icon(Icons.home, color: _PalUi.primaryBlue),
+                selectedIcon: const Icon(Icons.home, color: _PalUi.primaryBlue),
                 label: 'الرئيسية',
               ),
               NavigationDestination(
                 icon: const Icon(Icons.map_outlined),
-                selectedIcon:
-                    const Icon(Icons.map_rounded, color: _PalUi.primaryBlue),
+                selectedIcon: const Icon(
+                  Icons.map_rounded,
+                  color: _PalUi.primaryBlue,
+                ),
                 label: 'تخطيط',
               ),
               NavigationDestination(
                 icon: const Icon(Icons.notifications_none_rounded),
-                selectedIcon: const Icon(Icons.notifications_rounded,
-                    color: _PalUi.primaryBlue),
+                selectedIcon: const Icon(
+                  Icons.notifications_rounded,
+                  color: _PalUi.primaryBlue,
+                ),
                 label: 'الإشعارات',
               ),
               NavigationDestination(
                 icon: const Icon(Icons.menu_rounded),
-                selectedIcon: const Icon(Icons.menu_open_rounded,
-                    color: _PalUi.primaryBlue),
+                selectedIcon: const Icon(
+                  Icons.menu_open_rounded,
+                  color: _PalUi.primaryBlue,
+                ),
                 label: 'الإعدادات',
               ),
             ],
@@ -400,9 +526,9 @@ class _NotificationsBody extends StatelessWidget {
       return Center(
         child: Text(
           'لا توجد إشعارات بعد',
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: AppColors.textMutedLight,
-              ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(color: AppColors.textMutedLight),
         ),
       );
     }
@@ -425,9 +551,13 @@ class _NotificationsBody extends StatelessWidget {
 }
 
 class _BlueHeader extends StatelessWidget {
-  const _BlueHeader({required this.onMenuPressed});
+  const _BlueHeader({
+    required this.onMenuPressed,
+    required this.onFavoritesPressed,
+  });
 
   final VoidCallback onMenuPressed;
+  final VoidCallback onFavoritesPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -450,15 +580,26 @@ class _BlueHeader extends StatelessWidget {
               icon: const Icon(Icons.more_vert, color: Colors.white),
             ),
           ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: IconButton(
+              tooltip: 'المفضلة',
+              onPressed: onFavoritesPressed,
+              icon: Icon(
+                Icons.favorite_border_rounded,
+                color: Colors.white.withValues(alpha: 0.95),
+              ),
+            ),
+          ),
           Text(
             'غ وين رايح',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 22,
-                  letterSpacing: 0.5,
-                ),
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: 22,
+              letterSpacing: 0.5,
+            ),
           ),
         ],
       ),
@@ -538,9 +679,7 @@ class _SegmentTile extends StatelessWidget {
               Icon(
                 icon,
                 size: 20,
-                color: selected
-                    ? _PalUi.primaryBlue
-                    : AppColors.textMutedLight,
+                color: selected ? _PalUi.primaryBlue : AppColors.textMutedLight,
               ),
               const SizedBox(width: 6),
               Flexible(
@@ -566,8 +705,9 @@ class _SegmentTile extends StatelessWidget {
   }
 }
 
-class _FilterStrip extends StatelessWidget {
-  const _FilterStrip({
+/// Filter chips only (no scroll); parent supplies [SingleChildScrollView].
+class _FilterChipsRow extends StatelessWidget {
+  const _FilterChipsRow({
     required this.cityLabel,
     required this.pinnedOn,
     required this.closestOn,
@@ -589,90 +729,37 @@ class _FilterStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-      child: Row(
-        children: <Widget>[
-          _FilterChipButton(
-            icon: Icons.keyboard_arrow_down_rounded,
-            label: cityLabel,
-            selected: cityLabel != 'اختر مدينة',
-            onTap: onCityTap,
-          ),
-          const SizedBox(width: 8),
-          _FilterChipButton(
-            icon: Icons.bookmark_outline_rounded,
-            label: 'المثبتة',
-            selected: pinnedOn,
-            onTap: onPinnedTap,
-          ),
-          const SizedBox(width: 8),
-          _FilterChipButton(
-            icon: Icons.navigation_rounded,
-            label: 'الأقرب',
-            selected: closestOn,
-            onTap: onClosestTap,
-          ),
-          const SizedBox(width: 8),
-          _FilterChipButton(
-            icon: Icons.view_agenda_outlined,
-            label: 'مصغر',
-            selected: compactOn,
-            onTap: onCompactTap,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CheckpointSearchDialog extends StatefulWidget {
-  const _CheckpointSearchDialog();
-
-  @override
-  State<_CheckpointSearchDialog> createState() =>
-      _CheckpointSearchDialogState();
-}
-
-class _CheckpointSearchDialogState extends State<_CheckpointSearchDialog> {
-  final TextEditingController _controller = TextEditingController();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: AlertDialog(
-        backgroundColor: AppColors.cardLight,
-        title: const Text('بحث عن حاجز'),
-        content: TextField(
-          controller: _controller,
-          autofocus: true,
-          textAlign: TextAlign.right,
-          decoration: const InputDecoration(
-            hintText: 'اسم الحاجز…',
-            border: OutlineInputBorder(),
-          ),
-          onSubmitted: (String v) => Navigator.of(context).pop(v.trim()),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        _FilterChipButton(
+          icon: Icons.keyboard_arrow_down_rounded,
+          label: cityLabel,
+          selected: cityLabel != 'اختر مدينة',
+          onTap: onCityTap,
         ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(null),
-            child: const Text('إلغاء'),
-          ),
-          FilledButton(
-            onPressed: () =>
-                Navigator.of(context).pop(_controller.text.trim()),
-            child: const Text('بحث'),
-          ),
-        ],
-      ),
+        const SizedBox(width: 8),
+        _FilterChipButton(
+          icon: Icons.bookmark_outline_rounded,
+          label: 'المثبتة',
+          selected: pinnedOn,
+          onTap: onPinnedTap,
+        ),
+        const SizedBox(width: 8),
+        _FilterChipButton(
+          icon: Icons.navigation_rounded,
+          label: 'الأقرب',
+          selected: closestOn,
+          onTap: onClosestTap,
+        ),
+        const SizedBox(width: 8),
+        _FilterChipButton(
+          icon: Icons.view_agenda_outlined,
+          label: 'مصغر',
+          selected: compactOn,
+          onTap: onCompactTap,
+        ),
+      ],
     );
   }
 }
@@ -738,13 +825,9 @@ class _FilterChipButton extends StatelessWidget {
 }
 
 class _ShareUpdatesBar extends StatelessWidget {
-  const _ShareUpdatesBar({
-    required this.onShareTap,
-    required this.onSearchTap,
-  });
+  const _ShareUpdatesBar({required this.onShareTap});
 
   final VoidCallback onShareTap;
-  final VoidCallback onSearchTap;
 
   @override
   Widget build(BuildContext context) {
@@ -756,57 +839,36 @@ class _ShareUpdatesBar extends StatelessWidget {
           Text(
             'خليك قريب من تحديثاتنا عبر صفحاتنا',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textMutedLight,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppColors.textMutedLight),
           ),
           const SizedBox(height: 10),
-          Row(
-            children: <Widget>[
-              Material(
-                color: AppColors.cardLight,
-                elevation: 1,
-                shadowColor: Colors.black.withValues(alpha: 0.06),
-                shape: const CircleBorder(),
-                clipBehavior: Clip.antiAlias,
-                child: InkWell(
-                  onTap: onSearchTap,
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Icon(Icons.search, color: _PalUi.primaryBlue),
-                  ),
-                ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: _PalUi.primaryBlue,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(
+                vertical: 14,
+                horizontal: 12,
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: _PalUi.primaryBlue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 14,
-                      horizontal: 12,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                  ),
-                  onPressed: onShareTap,
-                  icon: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.add, size: 20),
-                  ),
-                  label: const Text(
-                    'شاركنا بتحديث',
-                    style: TextStyle(fontWeight: FontWeight.w800),
-                  ),
-                ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(999),
               ),
-            ],
+            ),
+            onPressed: onShareTap,
+            icon: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.add, size: 20),
+            ),
+            label: const Text(
+              'شاركنا بتحديث',
+              style: TextStyle(fontWeight: FontWeight.w800),
+            ),
           ),
         ],
       ),

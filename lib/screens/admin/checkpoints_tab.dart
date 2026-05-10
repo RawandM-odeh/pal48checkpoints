@@ -17,9 +17,7 @@ List<String> _distinctCheckpointCities(List<Checkpoint> items) {
     }
   }
   final List<String> list = set.toList(growable: false);
-  list.sort(
-    (String a, String b) => a.toLowerCase().compareTo(b.toLowerCase()),
-  );
+  list.sort((String a, String b) => a.toLowerCase().compareTo(b.toLowerCase()));
   return list;
 }
 
@@ -97,17 +95,19 @@ class _CheckpointsTabState extends State<CheckpointsTab> {
       return;
     }
     try {
-      await context.read<CheckpointProvider>().repository.deleteCheckpoint(c.id);
+      await context.read<CheckpointProvider>().repository.deleteCheckpoint(
+        c.id,
+      );
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم الحذف')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('تم الحذف')));
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('خطأ: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('خطأ: $e')));
       }
     }
   }
@@ -197,8 +197,7 @@ class _CheckpointsTabState extends State<CheckpointsTab> {
                               ...cities.map(
                                 (String city) => DropdownMenuItem<String?>(
                                   value: city,
-                                  child:
-                                      Text(city, textAlign: TextAlign.right),
+                                  child: Text(city, textAlign: TextAlign.right),
                                 ),
                               ),
                             ],
@@ -217,8 +216,9 @@ class _CheckpointsTabState extends State<CheckpointsTab> {
                         child: Text(
                           'لا توجد حواجز لهذه المدينة',
                           style: theme.textTheme.titleMedium?.copyWith(
-                            color: CheckpointCardStyle.navy
-                                .withValues(alpha: 0.55),
+                            color: CheckpointCardStyle.navy.withValues(
+                              alpha: 0.55,
+                            ),
                           ),
                         ),
                       )
@@ -226,11 +226,12 @@ class _CheckpointsTabState extends State<CheckpointsTab> {
                         padding: const EdgeInsets.fromLTRB(8, 4, 8, 88),
                         gridDelegate:
                             const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 8,
-                          mainAxisSpacing: 8,
-                          mainAxisExtent: CheckpointCardStyle.adminCardHeight,
-                        ),
+                              crossAxisCount: 2,
+                              crossAxisSpacing: 8,
+                              mainAxisSpacing: 8,
+                              mainAxisExtent:
+                                  CheckpointCardStyle.adminCardHeight,
+                            ),
                         itemCount: filtered.length,
                         itemBuilder: (BuildContext context, int index) {
                           final Checkpoint c = filtered[index];
@@ -242,8 +243,10 @@ class _CheckpointsTabState extends State<CheckpointsTab> {
                             trailing: const SizedBox(width: 26),
                             footer: TextButton.icon(
                               onPressed: () => _confirmDelete(context, c),
-                              icon: const Text('🗑️',
-                                  style: TextStyle(fontSize: 18)),
+                              icon: const Text(
+                                '🗑️',
+                                style: TextStyle(fontSize: 18),
+                              ),
                               label: const Text('حذف'),
                               style: TextButton.styleFrom(
                                 foregroundColor: theme.colorScheme.error,
@@ -284,6 +287,7 @@ class _AddCheckpointDialogState extends State<_AddCheckpointDialog> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _nameArCtrl = TextEditingController();
   final TextEditingController _nameEnCtrl = TextEditingController();
+
   /// يُستخدم فقط إذا لم تكن هناك مدن مستخرجة بعد من الحواجز الحالية.
   final TextEditingController _cityManualCtrl = TextEditingController();
   final TextEditingController _aliasesCtrl = TextEditingController();
@@ -363,16 +367,12 @@ class _AddCheckpointDialogState extends State<_AddCheckpointDialog> {
         return;
       }
       nav.pop();
-      messenger.showSnackBar(
-        const SnackBar(content: Text('تمت الإضافة')),
-      );
+      messenger.showSnackBar(const SnackBar(content: Text('تمت الإضافة')));
     } catch (e) {
       if (mounted) {
         setState(() => _saving = false);
       }
-      messenger.showSnackBar(
-        SnackBar(content: Text('خطأ: $e')),
-      );
+      messenger.showSnackBar(SnackBar(content: Text('خطأ: $e')));
     }
   }
 
@@ -447,7 +447,8 @@ class _AddCheckpointDialogState extends State<_AddCheckpointDialog> {
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
                           isExpanded: true,
-                          value: _selectedCity != null &&
+                          value:
+                              _selectedCity != null &&
                                   cities.contains(_selectedCity)
                               ? _selectedCity
                               : null,

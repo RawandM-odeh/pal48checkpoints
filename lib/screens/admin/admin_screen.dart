@@ -35,10 +35,7 @@ class _AdminScreenState extends State<AdminScreen> {
             ),
           ],
         ),
-        body: IndexedStack(
-          index: _currentIndex,
-          children: _tabs,
-        ),
+        body: IndexedStack(index: _currentIndex, children: _tabs),
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _currentIndex,
           onTap: (int i) => setState(() => _currentIndex = i),

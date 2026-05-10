@@ -4,10 +4,7 @@ import 'package:flutter/material.dart';
 import '../utils/geo_distance.dart';
 
 /// مصدر كتابة الحالة في الخادم (لوحة الإدارة مقابل مستخدم التطبيق).
-enum CheckpointUpdateSource {
-  admin,
-  user,
-}
+enum CheckpointUpdateSource { admin, user }
 
 /// عنصر واحد في سجل التحديثات المخزَّن في الوثيقة (حد أقصى 6 في الخادم).
 class CheckpointHistoryEntry {
@@ -36,9 +33,12 @@ class CheckpointHistoryEntry {
     if (at == null) {
       return null;
     }
-    final ({String entrance, String exit}) dirs = Checkpoint.readDirections(map);
-    final String srcRaw =
-        (map['source'] is String ? (map['source'] as String).trim().toLowerCase() : '');
+    final ({String entrance, String exit}) dirs = Checkpoint.readDirections(
+      map,
+    );
+    final String srcRaw = (map['source'] is String
+        ? (map['source'] as String).trim().toLowerCase()
+        : '');
     final String source = srcRaw.isNotEmpty ? srcRaw : 'admin';
     return CheckpointHistoryEntry(
       at: at,
@@ -121,7 +121,9 @@ class Checkpoint {
         'exit_source',
         'exitSource',
       ]),
-      statusHistory: _parseStatusHistory(map['status_history'] ?? map['statusHistory']),
+      statusHistory: _parseStatusHistory(
+        map['status_history'] ?? map['statusHistory'],
+      ),
       reportTags: readReportTags(map),
     );
   }
@@ -203,6 +205,13 @@ class Checkpoint {
     }
     if (value is num) {
       return value.toDouble();
+    }
+    if (value is String) {
+      final String s = value.trim().replaceAll(',', '.');
+      if (s.isEmpty) {
+        return null;
+      }
+      return double.tryParse(s);
     }
     return null;
   }

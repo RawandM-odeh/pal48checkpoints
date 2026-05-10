@@ -19,7 +19,9 @@ Future<void> showLoginRequiredDialog(BuildContext context) async {
       return Directionality(
         textDirection: TextDirection.ltr,
         child: AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: const Text(
             'Please log in to continue.',
             textAlign: TextAlign.center,
@@ -49,6 +51,15 @@ Future<void> showLoginRequiredDialog(BuildContext context) async {
 
 /// Returns `true` if the user may perform checkpoint writes; otherwise shows dialog and `false`.
 Future<bool> ensureCanMakeCheckpointChanges(BuildContext context) async {
+  if (canUserMakeCheckpointWrites) {
+    return true;
+  }
+  await showLoginRequiredDialog(context);
+  return false;
+}
+
+/// Same account requirement as checkpoint updates: skip-guest and anonymous users must sign in (e.g. Google) first.
+Future<bool> ensureLoggedInForFavorites(BuildContext context) async {
   if (canUserMakeCheckpointWrites) {
     return true;
   }

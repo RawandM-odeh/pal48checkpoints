@@ -30,24 +30,24 @@ class _SendNotificationTabState extends State<SendNotificationTab> {
     setState(() => _sending = true);
     try {
       await context.read<NotificationRepository>().saveNotificationDocument(
-            title: _titleCtrl.text,
-            body: _bodyCtrl.text,
-          );
+        title: _titleCtrl.text,
+        body: _bodyCtrl.text,
+      );
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تم إرسال الإشعار')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('تم إرسال الإشعار')));
       _titleCtrl.clear();
       _bodyCtrl.clear();
     } catch (e) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('فشل الإرسال: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('فشل الإرسال: $e')));
     } finally {
       if (mounted) {
         setState(() => _sending = false);
@@ -110,8 +110,7 @@ class _SendNotificationTabState extends State<SendNotificationTab> {
                         dimension: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color:
-                              Theme.of(context).colorScheme.onPrimary,
+                          color: Theme.of(context).colorScheme.onPrimary,
                         ),
                       )
                     : const Icon(Icons.send),
