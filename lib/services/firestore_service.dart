@@ -9,15 +9,14 @@ class FirestoreService {
     required String email,
     String role = 'user',
   }) async {
-    await _db.collection('users').doc(uid).set({
-      'email': email,
-      'role': role,
-    });
+    await _db.collection('users').doc(uid).set({'email': email, 'role': role});
   }
 
   Future<String?> getUserRole(String uid) async {
-    final DocumentSnapshot<Map<String, dynamic>> doc =
-        await _db.collection('users').doc(uid).get();
+    final DocumentSnapshot<Map<String, dynamic>> doc = await _db
+        .collection('users')
+        .doc(uid)
+        .get();
     if (!doc.exists) return null;
     return doc.data()?['role'] as String?;
   }
@@ -32,16 +31,14 @@ class FirestoreService {
     }
     final bool isAnonymous = authUser.isAnonymous;
 
-    final DocumentReference<Map<String, dynamic>> userDoc =
-        _db.collection('users').doc(uid);
+    final DocumentReference<Map<String, dynamic>> userDoc = _db
+        .collection('users')
+        .doc(uid);
     final DocumentSnapshot<Map<String, dynamic>> snapshot = await userDoc.get();
 
     if (!snapshot.exists) {
       final String role = isAnonymous ? 'guest' : 'user';
-      await userDoc.set({
-        'email': email,
-        'role': role,
-      });
+      await userDoc.set({'email': email, 'role': role});
       return role;
     }
 
@@ -54,5 +51,58 @@ class FirestoreService {
     }
 
     return snapshot.data()?['role'] as String? ?? 'user';
+  }
+
+  Future<Set<String>> getFavoriteCheckpointIds(String uid) async {
+    final DocumentSnapshot<Map<String, dynamic>> doc = await _db
+        .collection('users')
+        .doc(uid)
+        .get();
+    if (!doc.exists) {
+      return <String>{};
+    }
+    final Object? raw = doc.data()?['favoriteCheckpointIds'];
+    if (raw is List) {
+      return raw
+          .whereType<String>()
+          .map((String s) => s.trim())
+          .where((String s) => s.isNotEmpty)
+          .toSet();
+    }
+    return <String>{};
+  }
+
+  Future<void> setFavoriteCheckpointIds(String uid, Set<String> ids) async {
+    final List<String> sorted = ids.toList()..sort();
+    await _db.collection('users').doc(uid).set(<String, Object?>{
+      'favoriteCheckpointIds': sorted,
+    }, SetOptions(merge: true));
+  }
+
+  /// حواجز «المثبتة» المحفوظة في حساب المستخدم (`savedCheckpointIds`).
+  Future<Set<String>> getSavedCheckpointIds(String uid) async {
+    final DocumentSnapshot<Map<String, dynamic>> doc = await _db
+        .collection('users')
+        .doc(uid)
+        .get();
+    if (!doc.exists) {
+      return <String>{};
+    }
+    final Object? raw = doc.data()?['savedCheckpointIds'];
+    if (raw is List) {
+      return raw
+          .whereType<String>()
+          .map((String s) => s.trim())
+          .where((String s) => s.isNotEmpty)
+          .toSet();
+    }
+    return <String>{};
+  }
+
+  Future<void> setSavedCheckpointIds(String uid, Set<String> ids) async {
+    final List<String> sorted = ids.toList()..sort();
+    await _db.collection('users').doc(uid).set(<String, Object?>{
+      'savedCheckpointIds': sorted,
+    }, SetOptions(merge: true));
   }
 }

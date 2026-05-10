@@ -9,8 +9,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// (`admin-restricted-operation` in some projects).
 final class GuestBrowseProvider extends ChangeNotifier {
   GuestBrowseProvider(SharedPreferences prefs)
-      : _prefs = prefs,
-        _guest = prefs.getBool(_kKey) ?? false;
+    : _prefs = prefs,
+      _guest = prefs.getBool(_kKey) ?? false;
 
   static const String _kKey = 'guest_browse_mode';
 

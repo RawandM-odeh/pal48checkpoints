@@ -1,13 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:provider/provider.dart';
 
 import '../../models/checkpoint.dart';
 import '../../providers/checkpoint_provider.dart';
+import '../../providers/favorite_checkpoints_provider.dart';
+import '../../providers/saved_checkpoints_provider.dart';
 import '../../theme/app_colors.dart';
 import '../../utils/ar_relative_time.dart';
+import '../../utils/city_display_ar.dart';
+import '../../utils/guest_session.dart';
 import '../widgets/checkpoint_card.dart';
 import '../widgets/split_checkpoint_pin.dart';
 
@@ -61,9 +67,7 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
     final List<Checkpoint> withCoords = items
         .where((Checkpoint c) => c.hasCoordinates)
         .toList(growable: false);
-    withCoords.sort(
-      (Checkpoint a, Checkpoint b) => a.id.compareTo(b.id),
-    );
+    withCoords.sort((Checkpoint a, Checkpoint b) => a.id.compareTo(b.id));
     return withCoords
         .map(
           (Checkpoint c) =>
@@ -81,8 +85,9 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
   }
 
   void _scheduleFitCamera(List<Checkpoint> items) {
-    final List<Checkpoint> pts =
-        items.where((Checkpoint c) => c.hasCoordinates).toList(growable: false);
+    final List<Checkpoint> pts = items
+        .where((Checkpoint c) => c.hasCoordinates)
+        .toList(growable: false);
     final String sig = _signature(items);
     if (pts.isEmpty) {
       if (sig != _lastFitSignature) {
@@ -101,10 +106,7 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
       try {
         if (pts.length == 1) {
           final Checkpoint c = pts.first;
-          _mapController.move(
-            LatLng(c.latitude!, c.longitude!),
-            12,
-          );
+          _mapController.move(LatLng(c.latitude!, c.longitude!), 12);
           return;
         }
         double minLat = pts.first.latitude!;
@@ -132,10 +134,7 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
           LatLng(maxLat, maxLng),
         );
         _mapController.fitCamera(
-          CameraFit.bounds(
-            bounds: bounds,
-            padding: const EdgeInsets.all(56),
-          ),
+          CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(56)),
         );
       } catch (_) {
         // تجاهل إذا كانت الحدود غير صالحة لسبب ما
@@ -143,10 +142,7 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
     });
   }
 
-  void _showCityFilterSheet(
-    BuildContext context,
-    Map<String, String> catalog,
-  ) {
+  void _showCityFilterSheet(BuildContext context, Map<String, String> catalog) {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppColors.cardLight,
@@ -154,95 +150,104 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
       isScrollControlled: true,
       builder: (BuildContext bc) {
         final List<MapEntry<String, String>> entries =
-            catalog.entries.toList(growable: false)
-              ..sort(
-                (MapEntry<String, String> a, MapEntry<String, String> b) =>
-                    a.value.compareTo(b.value),
-              );
+            catalog.entries.toList(growable: false)..sort(
+              (MapEntry<String, String> a, MapEntry<String, String> b) =>
+                  cityDisplayNameAr(
+                    a.value,
+                  ).compareTo(cityDisplayNameAr(b.value)),
+            );
         final double maxH = MediaQuery.sizeOf(bc).height * 0.62;
         return Directionality(
           textDirection: TextDirection.rtl,
           child: StatefulBuilder(
             builder:
-                (BuildContext context, void Function(void Function()) setModal) {
-              return Padding(
-                padding: EdgeInsets.fromLTRB(
-                  16,
-                  8,
-                  16,
-                  16 + MediaQuery.paddingOf(bc).bottom,
-                ),
-                child: SizedBox(
-                  height: maxH,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      Text(
-                        'اختر المدن المعروضة على الخريطة',
-                        textAlign: TextAlign.center,
-                        style: Theme.of(bc).textTheme.titleMedium?.copyWith(
+                (
+                  BuildContext context,
+                  void Function(void Function()) setModal,
+                ) {
+                  return Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      8,
+                      16,
+                      16 + MediaQuery.paddingOf(bc).bottom,
+                    ),
+                    child: SizedBox(
+                      height: maxH,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: <Widget>[
+                          Text(
+                            'اختر المدن المعروضة على الخريطة',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(bc).textTheme.titleMedium?.copyWith(
                               color: AppColors.textPrimaryLight,
                               fontWeight: FontWeight.w700,
                             ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: <Widget>[
-                          TextButton(
-                            onPressed: () {
-                              setState(() {
-                                _selectedCityKeys
-                                  ..clear()
-                                  ..addAll(catalog.keys);
-                              });
-                              setModal(() {});
-                            },
-                            child: const Text('تحديد الكل'),
                           ),
-                          TextButton(
-                            onPressed: () {
-                              setState(_selectedCityKeys.clear);
-                              setModal(() {});
-                            },
-                            child: const Text('مسح'),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: <Widget>[
+                              TextButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _selectedCityKeys
+                                      ..clear()
+                                      ..addAll(catalog.keys);
+                                  });
+                                  setModal(() {});
+                                },
+                                child: const Text('تحديد الكل'),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  setState(_selectedCityKeys.clear);
+                                  setModal(() {});
+                                },
+                                child: const Text('مسح'),
+                              ),
+                            ],
+                          ),
+                          Expanded(
+                            child: ListView.builder(
+                              itemCount: entries.length,
+                              itemBuilder: (BuildContext _, int i) {
+                                final MapEntry<String, String> e = entries[i];
+                                final bool on = _selectedCityKeys.contains(
+                                  e.key,
+                                );
+                                return CheckboxListTile(
+                                  value: on,
+                                  onChanged: (bool? v) {
+                                    setState(() {
+                                      if (v == true) {
+                                        _selectedCityKeys.add(e.key);
+                                      } else {
+                                        _selectedCityKeys.remove(e.key);
+                                      }
+                                    });
+                                    setModal(() {});
+                                  },
+                                  activeColor: AppColors.brandTeal,
+                                  title: Text(
+                                    e.key == '__NONE__'
+                                        ? e.value
+                                        : cityDisplayNameAr(e.value),
+                                    style: const TextStyle(
+                                      color: AppColors.textPrimaryLight,
+                                    ),
+                                  ),
+                                  controlAffinity:
+                                      ListTileControlAffinity.leading,
+                                );
+                              },
+                            ),
                           ),
                         ],
                       ),
-                      Expanded(
-                        child: ListView.builder(
-                          itemCount: entries.length,
-                          itemBuilder: (BuildContext _, int i) {
-                            final MapEntry<String, String> e = entries[i];
-                            final bool on = _selectedCityKeys.contains(e.key);
-                            return CheckboxListTile(
-                              value: on,
-                              onChanged: (bool? v) {
-                                setState(() {
-                                  if (v == true) {
-                                    _selectedCityKeys.add(e.key);
-                                  } else {
-                                    _selectedCityKeys.remove(e.key);
-                                  }
-                                });
-                                setModal(() {});
-                              },
-                              activeColor: AppColors.brandTeal,
-                              title: Text(
-                                e.value,
-                                style: const TextStyle(
-                                  color: AppColors.textPrimaryLight,
-                                ),
-                              ),
-                              controlAffinity: ListTileControlAffinity.leading,
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
+                    ),
+                  );
+                },
           ),
         );
       },
@@ -263,9 +268,9 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
       _mapController.move(LatLng(pos.latitude, pos.longitude), 13);
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تعذّر تحديد موقعك')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('تعذّر تحديد موقعك')));
       }
     }
   }
@@ -274,6 +279,34 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
   void dispose() {
     _mapController.dispose();
     super.dispose();
+  }
+
+  Future<void> _toggleMapCheckpointFavorite(
+    BuildContext hostContext,
+    FavoriteCheckpointsProvider fv,
+    Checkpoint checkpoint,
+  ) async {
+    if (!await ensureLoggedInForFavorites(hostContext)) {
+      return;
+    }
+    if (!hostContext.mounted) {
+      return;
+    }
+    fv.toggle(checkpoint.id);
+  }
+
+  Future<void> _toggleMapCheckpointSaved(
+    BuildContext hostContext,
+    SavedCheckpointsProvider sv,
+    Checkpoint checkpoint,
+  ) async {
+    if (!await ensureLoggedInForSaved(hostContext)) {
+      return;
+    }
+    if (!hostContext.mounted) {
+      return;
+    }
+    sv.toggle(checkpoint.id);
   }
 
   Future<void> _showCheckpointSheet(BuildContext context, Checkpoint c) async {
@@ -291,57 +324,103 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
               20,
               16 + MediaQuery.paddingOf(bc).bottom,
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                Text(
-                  c.name.isEmpty ? 'بدون اسم' : c.name,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(bc).textTheme.titleLarge?.copyWith(
-                        color: AppColors.textPrimaryLight,
-                        fontWeight: FontWeight.w800,
-                      ),
-                ),
-                if (c.location.trim().isNotEmpty) ...<Widget>[
-                  const SizedBox(height: 6),
-                  Text(
-                    c.location.trim(),
-                    textAlign: TextAlign.center,
-                    style: Theme.of(bc).textTheme.bodyMedium?.copyWith(
+            child: Consumer2<FavoriteCheckpointsProvider,
+                SavedCheckpointsProvider>(
+              builder: (
+                BuildContext _,
+                FavoriteCheckpointsProvider fv,
+                SavedCheckpointsProvider sv,
+                Widget? child,
+              ) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      textDirection: TextDirection.rtl,
+                      children: <Widget>[
+                        IconButton(
+                          tooltip: 'مفضل',
+                          onPressed: () => unawaited(
+                            _toggleMapCheckpointFavorite(context, fv, c),
+                          ),
+                          icon: Icon(
+                            fv.isFavorite(c.id)
+                                ? Icons.favorite
+                                : Icons.favorite_border,
+                            color: fv.isFavorite(c.id)
+                                ? const Color(0xFFE11D48)
+                                : AppColors.textMutedLight,
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            c.name.isEmpty ? 'بدون اسم' : c.name,
+                            textAlign: TextAlign.center,
+                            style: Theme.of(bc).textTheme.titleLarge?.copyWith(
+                                  color: AppColors.textPrimaryLight,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'مثبتة',
+                          onPressed: () => unawaited(
+                            _toggleMapCheckpointSaved(context, sv, c),
+                          ),
+                          icon: Icon(
+                            sv.isSaved(c.id)
+                                ? Icons.bookmark
+                                : Icons.bookmark_border_rounded,
+                            color: sv.isSaved(c.id)
+                                ? AppColors.brandTeal
+                                : AppColors.textMutedLight,
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (c.location.trim().isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 6),
+                      Text(
+                        cityDisplayNameAr(c.location),
+                        textAlign: TextAlign.center,
+                        style: Theme.of(bc).textTheme.bodyMedium?.copyWith(
                           color: AppColors.textMutedLight,
                         ),
-                  ),
-                ],
-                const SizedBox(height: 16),
-                _SheetDirectionRow(
-                  label: 'للداخل',
-                  status: c.entranceStatus,
-                  updated: c.entranceUpdatedAt,
-                  onTap: () async {
-                    Navigator.of(bc).pop();
-                    await showCheckpointStatusSheet(
-                      context: context,
-                      checkpoint: c,
-                      direction: 'entrance',
-                    );
-                  },
-                ),
-                const SizedBox(height: 10),
-                _SheetDirectionRow(
-                  label: 'للخارج',
-                  status: c.exitStatus,
-                  updated: c.exitUpdatedAt,
-                  onTap: () async {
-                    Navigator.of(bc).pop();
-                    await showCheckpointStatusSheet(
-                      context: context,
-                      checkpoint: c,
-                      direction: 'exit',
-                    );
-                  },
-                ),
-              ],
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    _SheetDirectionRow(
+                      label: 'للداخل',
+                      status: c.entranceStatus,
+                      updated: c.entranceUpdatedAt,
+                      onTap: () async {
+                        Navigator.of(bc).pop();
+                        await showCheckpointStatusSheet(
+                          context: context,
+                          checkpoint: c,
+                          direction: 'entrance',
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    _SheetDirectionRow(
+                      label: 'للخارج',
+                      status: c.exitStatus,
+                      updated: c.exitUpdatedAt,
+                      onTap: () async {
+                        Navigator.of(bc).pop();
+                        await showCheckpointStatusSheet(
+                          context: context,
+                          checkpoint: c,
+                          direction: 'exit',
+                        );
+                      },
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         );
@@ -441,8 +520,10 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
               child: InkWell(
                 onTap: () => _showCityFilterSheet(context, catalog),
                 child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
                   child: Row(
                     children: <Widget>[
                       const Icon(
@@ -454,11 +535,11 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
                       Expanded(
                         child: Text(
                           'فلتر المدن',
-                          style:
-                              Theme.of(context).textTheme.titleSmall?.copyWith(
-                                    color: AppColors.textPrimaryLight,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(
+                                color: AppColors.textPrimaryLight,
+                                fontWeight: FontWeight.w700,
+                              ),
                         ),
                       ),
                       Container(
@@ -472,11 +553,11 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
                         ),
                         child: Text(
                           '${_selectedCityKeys.length}/${catalog.length}',
-                          style:
-                              Theme.of(context).textTheme.labelMedium?.copyWith(
-                                    color: AppColors.brandTealDark,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                          style: Theme.of(context).textTheme.labelMedium
+                              ?.copyWith(
+                                color: AppColors.brandTealDark,
+                                fontWeight: FontWeight.w700,
+                              ),
                         ),
                       ),
                     ],
@@ -493,14 +574,14 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
             '© OpenStreetMap contributors',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: Colors.white70,
-                  shadows: <Shadow>[
-                    Shadow(
-                      color: Colors.black.withValues(alpha: 0.85),
-                      blurRadius: 6,
-                    ),
-                  ],
+              color: Colors.white70,
+              shadows: <Shadow>[
+                Shadow(
+                  color: Colors.black.withValues(alpha: 0.85),
+                  blurRadius: 6,
                 ),
+              ],
+            ),
           ),
         ),
         Positioned(
@@ -541,8 +622,8 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
                   Text(
                     'الدبوس',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: AppColors.textMutedLight,
-                        ),
+                      color: AppColors.textMutedLight,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   _SplitLegendPreview(),
@@ -550,9 +631,9 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
                   Text(
                     'النصف الأيسر = دخول · الأيمن = خروج',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: AppColors.textMutedLight,
-                          fontSize: 10,
-                        ),
+                      color: AppColors.textMutedLight,
+                      fontSize: 10,
+                    ),
                   ),
                 ],
               ),
@@ -579,9 +660,9 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
                   'لا توجد إحداثيات على الحواجز بعد — أضف latitude/longitude في Firestore.',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.amber.shade900,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    color: Colors.amber.shade900,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),
@@ -606,9 +687,9 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
                   'لم يُحدَّد عرض أي مدينة — اضغط «فلتر المدن» واختر المدن التي تريدها على الخريطة.',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.blue.shade800,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    color: Colors.blue.shade800,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),
@@ -654,9 +735,9 @@ class _SplitLegendPreview extends StatelessWidget {
           'كل نصف بلون حالة ذلك الاتجاه (سالك، أزمة، مغلق، جيش، مستوطنون)',
           textAlign: TextAlign.right,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: AppColors.textMutedLight,
-                fontSize: 10,
-              ),
+            color: AppColors.textMutedLight,
+            fontSize: 10,
+          ),
         ),
       ],
     );
@@ -686,9 +767,9 @@ class _SheetDirectionRow extends StatelessWidget {
           label,
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: AppColors.textMutedLight,
-                fontWeight: FontWeight.w700,
-              ),
+            color: AppColors.textMutedLight,
+            fontWeight: FontWeight.w700,
+          ),
         ),
         const SizedBox(height: 6),
         Material(
@@ -708,23 +789,23 @@ class _SheetDirectionRow extends StatelessWidget {
                   Text(
                     CheckpointStatus.badgeLabelAr(status),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: styl.fg,
-                          fontWeight: FontWeight.w800,
-                        ),
+                      color: styl.fg,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     arabicRelativeSince(updated),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.textMutedLight,
-                        ),
+                      color: AppColors.textMutedLight,
+                    ),
                   ),
                   Text(
                     'اضغط لتغيير الحالة',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: AppColors.brandTeal,
-                          fontWeight: FontWeight.w700,
-                        ),
+                      color: AppColors.brandTeal,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ],
               ),

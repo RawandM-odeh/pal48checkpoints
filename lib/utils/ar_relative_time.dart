@@ -1,7 +1,10 @@
-/// نص وقت نسبي مبسط بالعربية (لم يُستخدم `intl` لتقليل الاعتماديات).
+/// نص وقت نسبي بالعربية — دقة أعلى للدقائق والدمج «ساعة و دقائق» / «يوم و ساعات».
 ///
-/// أقل من ساعة: الدقائق فقط. من ساعة حتى أقل من 24 ساعة: الساعات.
-/// بعدها: الأيام ثم الأسابيع.
+/// لا يُستخدم `intl` لتقليل الاعتماديات.
+const int _kMinutesPerHour = 60;
+const int _kHoursPerDay = 24;
+const int _kMinutesPerDay = _kMinutesPerHour * _kHoursPerDay;
+
 String arabicRelativeSince(DateTime? updated) {
   if (updated == null) {
     return 'لا وقت محدَّث';
@@ -12,65 +15,113 @@ String arabicRelativeSince(DateTime? updated) {
     diff = Duration.zero;
   }
 
-  final int minutesTotal = diff.inMinutes;
-  if (minutesTotal < 1) {
+  final int totalMinutes = diff.inMinutes;
+  if (totalMinutes < 1) {
     return 'الآن';
   }
-  if (minutesTotal < 60) {
-    return _arabicMinutesPhrase(minutesTotal);
+
+  /// أقل من 24 ساعة: ساعات (ومعها الدقائق المتبقية عند وجودها).
+  if (totalMinutes < _kMinutesPerDay) {
+    return _arabicLessThanOneDayPhrase(totalMinutes);
   }
 
-  final int hoursTotal = diff.inHours;
-  if (hoursTotal < 24) {
-    return _arabicHoursPhrase(hoursTotal);
-  }
+  /// باقِ الدقائق من [totalMinutes] أدق من [Duration.inHours] عند حدّ 24 ساعة.
+  final int days = totalMinutes ~/ _kMinutesPerDay;
 
-  final int days = diff.inDays;
-  if (days == 1) {
-    return 'منذ يوم';
-  }
+  /// أقل من أسبوعين: أيام؛ مع باقِ دقيق للساعات/الدقائق ضمن ذلك النطاق.
   if (days < 14) {
-    return _arabicDaysPhrase(days);
+    final int remMinutes = totalMinutes % _kMinutesPerDay;
+    if (remMinutes == 0) {
+      return _arabicDaysPhrase(days);
+    }
+    final int remainderHours = remMinutes ~/ _kMinutesPerHour;
+    final int remainderMins = remMinutes % _kMinutesPerHour;
+    if (remainderHours == 0) {
+      return '${_arabicDaysFragment(days)} و '
+          '${_arabicMinutesFragment(remainderMins)}';
+    }
+    if (remainderMins == 0) {
+      return '${_arabicDaysFragment(days)} و '
+          '${_arabicHoursFragment(remainderHours)}';
+    }
+    return '${_arabicDaysFragment(days)} و '
+        '${_arabicHoursFragment(remainderHours)} و '
+        '${_arabicMinutesFragment(remainderMins)}';
   }
 
   final int weeks = days ~/ 7;
   return _arabicWeeksPhrase(weeks);
 }
 
-String _arabicMinutesPhrase(int minutes) {
-  if (minutes == 1) {
-    return 'منذ دقيقة واحدة';
+String _arabicLessThanOneDayPhrase(int totalMinutes) {
+  if (totalMinutes < _kMinutesPerHour) {
+    return _arabicMinutesWithSince(totalMinutes);
   }
-  if (minutes == 2) {
-    return 'منذ دقيقتين';
+  final int hours = totalMinutes ~/ _kMinutesPerHour;
+  final int mins = totalMinutes % _kMinutesPerHour;
+  if (mins == 0) {
+    return _arabicHoursWithSince(hours);
   }
-  if (minutes <= 10) {
-    return 'منذ $minutes دقائق';
-  }
-  return 'منذ $minutes دقيقة';
+  return 'منذ ${_arabicHoursFragment(hours)} و ${_arabicMinutesFragment(mins)}';
 }
 
-String _arabicHoursPhrase(int hours) {
+String _arabicMinutesWithSince(int minutes) {
+  return 'منذ ${_arabicMinutesFragment(minutes)}';
+}
+
+/// دقائق بصيغة عربية مألوفة (بدون البادئة «منذ») — للاستخدام المركَّب.
+String _arabicMinutesFragment(int minutes) {
+  if (minutes == 1) {
+    return 'دقيقة';
+  }
+  if (minutes == 2) {
+    return 'دقيقتين';
+  }
+  if (minutes <= 10) {
+    return '$minutes دقائق';
+  }
+  return '$minutes دقيقة';
+}
+
+String _arabicHoursWithSince(int hours) {
+  return 'منذ ${_arabicHoursFragment(hours)}';
+}
+
+/// ساعات بصيغة عربية مألوفة (بدون «منذ»).
+String _arabicHoursFragment(int hours) {
   if (hours == 1) {
-    return 'منذ ساعة';
+    return 'ساعة';
   }
   if (hours == 2) {
-    return 'منذ ساعتين';
+    return 'ساعتين';
   }
   if (hours <= 10) {
-    return 'منذ $hours ساعات';
+    return '$hours ساعات';
   }
-  return 'منذ $hours ساعة';
+  return '$hours ساعة';
+}
+
+/// بداية العبارة «منذ …» بالأيام — تُستخدم وحدها أو قبل «و …».
+String _arabicDaysFragment(int days) {
+  if (days == 1) {
+    return 'منذ يوم';
+  }
+  final String tail = _arabicDaysTail(days);
+  return 'منذ $tail';
+}
+
+String _arabicDaysTail(int days) {
+  if (days == 2) {
+    return 'يومين';
+  }
+  if (days <= 10) {
+    return '$days أيام';
+  }
+  return '$days يوماً';
 }
 
 String _arabicDaysPhrase(int days) {
-  if (days == 2) {
-    return 'منذ يومين';
-  }
-  if (days <= 10) {
-    return 'منذ $days أيام';
-  }
-  return 'منذ $days يوماً';
+  return _arabicDaysFragment(days);
 }
 
 String _arabicWeeksPhrase(int weeks) {

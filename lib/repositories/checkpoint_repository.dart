@@ -156,8 +156,7 @@ class CheckpointRepository {
   }) async {
     final String ne = CheckpointStatus.normalize(entranceStatus);
     final String nx = CheckpointStatus.normalize(exitStatus);
-    final DocumentReference<Map<String, dynamic>> docRef =
-        _collection.doc(id);
+    final DocumentReference<Map<String, dynamic>> docRef = _collection.doc(id);
 
     await _firestore.runTransaction((Transaction txn) async {
       final DocumentSnapshot<Map<String, dynamic>> snap = await txn.get(docRef);
@@ -211,8 +210,9 @@ class CheckpointRepository {
       throw ArgumentError('لا يُسمح بالرمز «/» في الاسم العربي');
     }
 
-    final DocumentReference<Map<String, dynamic>> docRef =
-        _collection.doc(docId);
+    final DocumentReference<Map<String, dynamic>> docRef = _collection.doc(
+      docId,
+    );
     final DocumentSnapshot<Map<String, dynamic>> existing = await docRef.get();
     if (existing.exists) {
       throw StateError('يوجد حاجز بنفس الاسم العربي (معرّف الوثيقة)');
