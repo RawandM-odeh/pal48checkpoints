@@ -12,7 +12,11 @@ abstract final class CheckpointCardStyle {
   static const Color arrowBlue = Color(0xFF4A90D9);
   static const double cardHeight = 220;
   /// ارتفاع خلية الشبكة في الإدارة (محتوى البطاقة أقل؛ المحاذاة للأعلى لتقليل الفراغ).
-  static const double adminCardHeight = 278;
+  /// رتل إضافي يمنع overflow عند وجود حاشية المصدر أو اختلاف بسيط في الخط.
+  static const double adminCardHeight = 292;
+  /// Entrance/exit row: fixed height so we avoid [IntrinsicHeight], which breaks
+  /// when descendants use [LayoutBuilder] (Flutter Web intrinsic passes).
+  static const double directionStripHeight = 126;
   static const double radius = 16;
 }
 
@@ -100,50 +104,51 @@ class CheckpointCard extends StatelessWidget {
           ),
         ),
         Divider(height: 16, thickness: 1, color: dividerColor),
-        IntrinsicHeight(
+        SizedBox(
+          height: CheckpointCardStyle.directionStripHeight,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             textDirection: TextDirection.rtl,
             children: <Widget>[
-                Expanded(
-                  child: _DirectionColumn(
-                    appearance: appearance,
-                    label: 'الدخول',
-                    status: checkpoint.entranceStatus,
-                    updatedAt: checkpoint.entranceUpdatedAt,
-                    sourceFootnote: Checkpoint.isInAppUpdateSource(
-                          checkpoint.entranceSource,
-                        )
-                        ? '(تحديث من داخل التطبيق)'
-                        : null,
-                    onTap: () => onStatusBadgeTap('entrance'),
-                  ),
+              Expanded(
+                child: _DirectionColumn(
+                  appearance: appearance,
+                  label: 'الدخول',
+                  status: checkpoint.entranceStatus,
+                  updatedAt: checkpoint.entranceUpdatedAt,
+                  sourceFootnote: Checkpoint.isInAppUpdateSource(
+                        checkpoint.entranceSource,
+                      )
+                      ? '(تحديث من داخل التطبيق)'
+                      : null,
+                  onTap: () => onStatusBadgeTap('entrance'),
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: VerticalDivider(
-                    width: 1,
-                    thickness: 1,
-                    color: midDividerColor,
-                  ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: VerticalDivider(
+                  width: 1,
+                  thickness: 1,
+                  color: midDividerColor,
                 ),
-                Expanded(
-                  child: _DirectionColumn(
-                    appearance: appearance,
-                    label: 'الخروج',
-                    status: checkpoint.exitStatus,
-                    updatedAt: checkpoint.exitUpdatedAt,
-                    sourceFootnote: Checkpoint.isInAppUpdateSource(
-                          checkpoint.exitSource,
-                        )
-                        ? '(تحديث من داخل التطبيق)'
-                        : null,
-                    onTap: () => onStatusBadgeTap('exit'),
-                  ),
+              ),
+              Expanded(
+                child: _DirectionColumn(
+                  appearance: appearance,
+                  label: 'الخروج',
+                  status: checkpoint.exitStatus,
+                  updatedAt: checkpoint.exitUpdatedAt,
+                  sourceFootnote: Checkpoint.isInAppUpdateSource(
+                        checkpoint.exitSource,
+                      )
+                      ? '(تحديث من داخل التطبيق)'
+                      : null,
+                  onTap: () => onStatusBadgeTap('exit'),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
+        ),
       ],
     );
 
@@ -218,44 +223,70 @@ class _DirectionColumn extends StatelessWidget {
         ? Colors.white38
         : CheckpointCardStyle.navy.withValues(alpha: 0.45);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        Text(
-          label,
-          textAlign: TextAlign.center,
-          style: theme.textTheme.labelLarge?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: labelColor,
-          ),
-        ),
-        const SizedBox(height: 8),
-        _StatusBadge(status: status, onTap: onTap),
-        const SizedBox(height: 6),
-        Text(
-          arabicRelativeSince(updatedAt),
-          textAlign: TextAlign.center,
-          style: theme.textTheme.bodySmall?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: timeColor,
-          ),
-        ),
-        if (sourceFootnote != null) ...<Widget>[
-          const SizedBox(height: 3),
-          Text(
-            sourceFootnote!,
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall?.copyWith(
-              fontWeight: FontWeight.w600,
-              fontSize: 9.5,
-              height: 1.2,
-              color: noteColor,
+    // [FittedBox] gives the child unbounded width during layout; [Column] + stretch needs a finite
+    // width. [LayoutBuilder] is OK here: direction strip uses fixed height, no [IntrinsicHeight].
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final double stripWidth =
+            constraints.maxWidth.isFinite ? constraints.maxWidth : 120;
+        return ClipRect(
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.topCenter,
+              child: SizedBox(
+                width: stripWidth,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: labelColor,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    _StatusBadge(status: status, onTap: onTap),
+                    const SizedBox(height: 4),
+                    Text(
+                      arabicRelativeSince(updatedAt),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: timeColor,
+                        height: 1.15,
+                      ),
+                    ),
+                    if (sourceFootnote != null) ...<Widget>[
+                      const SizedBox(height: 2),
+                      Text(
+                        sourceFootnote!,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 9.5,
+                          height: 1.15,
+                          color: noteColor,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ),
           ),
-        ],
-      ],
+        );
+      },
     );
   }
 }
@@ -276,7 +307,7 @@ class _StatusBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
           decoration: BoxDecoration(
             color: styl.bg,
             borderRadius: BorderRadius.circular(12),

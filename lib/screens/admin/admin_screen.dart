@@ -112,7 +112,7 @@ class _AdminScreenState extends State<AdminScreen> {
               BottomNavigationBarItem(
                 icon: Icon(Icons.campaign_outlined),
                 activeIcon: Icon(Icons.campaign),
-                label: '📢 إرسال إشعار',
+                label: '📢 حفظ إشعار',
               ),
             ],
           ),

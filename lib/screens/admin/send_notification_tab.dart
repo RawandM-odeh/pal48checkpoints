@@ -14,7 +14,7 @@ class _SendNotificationTabState extends State<SendNotificationTab> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _titleCtrl = TextEditingController();
   final TextEditingController _bodyCtrl = TextEditingController();
-  bool _sending = false;
+  bool _saving = false;
 
   @override
   void dispose() {
@@ -27,30 +27,19 @@ class _SendNotificationTabState extends State<SendNotificationTab> {
     if (!_formKey.currentState!.validate()) {
       return;
     }
-    setState(() => _sending = true);
+    setState(() => _saving = true);
     try {
-      final NotificationRepository repo =
-          context.read<NotificationRepository>();
-      final String docId = await repo.saveNotificationDocument(
-        title: _titleCtrl.text,
-        body: _bodyCtrl.text,
-      );
-      final Map<String, dynamic> sendResult = await repo.sendBroadcastToAllUsers(
-        title: _titleCtrl.text,
-        body: _bodyCtrl.text,
-        broadcastId: docId,
-      );
+      await context.read<NotificationRepository>().saveNotificationDocument(
+            title: _titleCtrl.text,
+            body: _bodyCtrl.text,
+          );
       if (!mounted) {
         return;
       }
-      final int delivered = (sendResult['delivered'] as num?)?.toInt() ?? 0;
-      final int targets = (sendResult['targets'] as num?)?.toInt() ?? 0;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text(
-            targets == 0
-                ? 'تم الحفظ؛ لا توجد أجهزة مسجّلة لاستلام الإشعار'
-                : 'تم الإرسال إلى $delivered من أصل $targets جهاز',
+            'تم حفظ الإشعار — سيظهر للمستخدمين في تبويب الإشعارات داخل التطبيق',
           ),
         ),
       );
@@ -61,11 +50,11 @@ class _SendNotificationTabState extends State<SendNotificationTab> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('فشل الإرسال: $e')),
+        SnackBar(content: Text('فشل الحفظ: $e')),
       );
     } finally {
       if (mounted) {
-        setState(() => _sending = false);
+        setState(() => _saving = false);
       }
     }
   }
@@ -82,8 +71,16 @@ class _SendNotificationTabState extends State<SendNotificationTab> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               Text(
-                'إرسال إشعار',
+                'حفظ إشعار للمستخدمين',
                 style: theme.textTheme.titleLarge,
+                textAlign: TextAlign.right,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'يُحفظ في السحابة ويُعرَض داخل التطبيق فقط (بدون إشعار نظام للهاتف).',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
+                ),
                 textAlign: TextAlign.right,
               ),
               const SizedBox(height: 16),
@@ -119,8 +116,8 @@ class _SendNotificationTabState extends State<SendNotificationTab> {
               ),
               const SizedBox(height: 24),
               FilledButton.icon(
-                onPressed: _sending ? null : _submit,
-                icon: _sending
+                onPressed: _saving ? null : _submit,
+                icon: _saving
                     ? SizedBox.square(
                         dimension: 20,
                         child: CircularProgressIndicator(
@@ -129,8 +126,8 @@ class _SendNotificationTabState extends State<SendNotificationTab> {
                               Theme.of(context).colorScheme.onPrimary,
                         ),
                       )
-                    : const Icon(Icons.send),
-                label: Text(_sending ? 'جاري الإرسال...' : 'إرسال إشعار'),
+                    : const Icon(Icons.save_alt_rounded),
+                label: Text(_saving ? 'جاري الحفظ...' : 'حفظ الإشعار'),
               ),
             ],
           ),

@@ -103,44 +103,58 @@ async function notifyAll(title, body, data = {}) {
 
 exports.sendBroadcastNotification = functions.https.onCall(
     async (data, context) => {
-      if (!context.auth) {
+      try {
+        if (!context.auth) {
+          throw new functions.https.HttpsError(
+              "unauthenticated",
+              "Login required.",
+          );
+        }
+
+        const userDoc =
+            await admin.firestore().collection("users").doc(context.auth.uid).get();
+        const role = userDoc.exists ? userDoc.data().role : null;
+        if (role !== "admin") {
+          throw new functions.https.HttpsError(
+              "permission-denied",
+              "Admin role required.",
+          );
+        }
+
+        const title =
+          typeof data.title === "string" ? data.title.trim() : "";
+        const body = typeof data.body === "string" ? data.body.trim() : "";
+        if (!title || !body) {
+          throw new functions.https.HttpsError(
+              "invalid-argument",
+              "Title and body are required.",
+          );
+        }
+
+        const broadcastIdRaw = data.broadcastId;
+        const broadcastId =
+          typeof broadcastIdRaw === "string" ? broadcastIdRaw.trim() : "";
+        /** @type {Record<string, string>} */
+        const payload = {type: "broadcast"};
+        if (broadcastId) {
+          payload.broadcastId = broadcastId;
+        }
+
+        const result = await notifyAll(title, body, payload);
+        return {ok: true, delivered: result.successCount, targets: result.total};
+      } catch (err) {
+        if (err instanceof functions.https.HttpsError) {
+          throw err;
+        }
+        console.error("sendBroadcastNotification failed", err);
+        const msg =
+          err && typeof err.message === "string" ? err.message : String(err);
         throw new functions.https.HttpsError(
-            "unauthenticated",
-            "Login required.",
+            "failed-precondition",
+            msg ||
+              "FCM failed (enable Blaze billing, FCM API, or check Functions logs).",
         );
       }
-
-      const userDoc =
-        await admin.firestore().collection("users").doc(context.auth.uid).get();
-      const role = userDoc.exists ? userDoc.data().role : null;
-      if (role !== "admin") {
-        throw new functions.https.HttpsError(
-            "permission-denied",
-            "Admin role required.",
-        );
-      }
-
-      const title =
-        typeof data.title === "string" ? data.title.trim() : "";
-      const body = typeof data.body === "string" ? data.body.trim() : "";
-      if (!title || !body) {
-        throw new functions.https.HttpsError(
-            "invalid-argument",
-            "Title and body are required.",
-        );
-      }
-
-      const broadcastIdRaw = data.broadcastId;
-      const broadcastId =
-        typeof broadcastIdRaw === "string" ? broadcastIdRaw.trim() : "";
-      /** @type {Record<string, string>} */
-      const payload = {type: "broadcast"};
-      if (broadcastId) {
-        payload.broadcastId = broadcastId;
-      }
-
-      const result = await notifyAll(title, body, payload);
-      return {ok: true, delivered: result.successCount, targets: result.total};
     });
 
 exports.onCheckpointUpdated = functions.firestore
