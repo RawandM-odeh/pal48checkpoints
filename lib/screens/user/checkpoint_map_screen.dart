@@ -27,6 +27,9 @@ abstract final class _OsmTiles {
 abstract final class _MapSeed {
   static final LatLng palestine = LatLng(31.9522, 35.2332);
   static const double initialZoom = 8.6;
+  static const double minZoom = 4;
+  static const double maxZoom = 19;
+  static const double zoomStep = 1;
 }
 
 /// خريطة OpenStreetMap عبر [flutter_map] — بدون Google Maps API أو فوترة Google.
@@ -318,6 +321,22 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
       if (mounted) {
         setState(() => _resolvingLocation = false);
       }
+    }
+  }
+
+  void _nudgeZoom(double delta) {
+    try {
+      final MapCamera cam = _mapController.camera;
+      final double z = (cam.zoom + delta).clamp(
+        _MapSeed.minZoom,
+        _MapSeed.maxZoom,
+      );
+      if ((z - cam.zoom).abs() < 1e-6) {
+        return;
+      }
+      _mapController.move(cam.center, z);
+    } catch (_) {
+      // قبل اكتمال تهيئة الخريطة
     }
   }
 
@@ -713,6 +732,8 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
           options: MapOptions(
             initialCenter: _MapSeed.palestine,
             initialZoom: _MapSeed.initialZoom,
+            minZoom: _MapSeed.minZoom,
+            maxZoom: _MapSeed.maxZoom,
             interactionOptions: const InteractionOptions(
               flags: InteractiveFlag.all,
             ),
@@ -813,6 +834,34 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
+              Material(
+                color: AppColors.cardLight,
+                elevation: 2,
+                shadowColor: AppColors.brandTeal.withValues(alpha: 0.12),
+                surfaceTintColor: Colors.transparent,
+                shape: const CircleBorder(),
+                clipBehavior: Clip.antiAlias,
+                child: IconButton(
+                  tooltip: 'تكبير',
+                  onPressed: () => _nudgeZoom(_MapSeed.zoomStep),
+                  icon: const Icon(Icons.add_rounded, color: AppColors.brandTeal),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Material(
+                color: AppColors.cardLight,
+                elevation: 2,
+                shadowColor: AppColors.brandTeal.withValues(alpha: 0.12),
+                surfaceTintColor: Colors.transparent,
+                shape: const CircleBorder(),
+                clipBehavior: Clip.antiAlias,
+                child: IconButton(
+                  tooltip: 'تصغير',
+                  onPressed: () => _nudgeZoom(-_MapSeed.zoomStep),
+                  icon: const Icon(Icons.remove_rounded, color: AppColors.brandTeal),
+                ),
+              ),
+              const SizedBox(height: 12),
               Material(
                 color: AppColors.cardLight,
                 elevation: 2,
