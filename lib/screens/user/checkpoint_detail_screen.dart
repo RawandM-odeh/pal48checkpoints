@@ -14,13 +14,20 @@ const Color _surfaceElevated = Color(0xFF2C3344);
 const Color _accentBlue = Color(0xFF2563EB);
 const Color _successGreen = Color(0xFF22C55E);
 const Color _headerBarBg = Color(0xFF232936);
-const double _kUpdateRadiusKm = 1.6;
+const double _kUpdateRadiusKm = 1.5;
 
 /// شاشة تفاصيل حاجز — تبويبات: آخر التحديثات، أرسل تحديث، معلومات الحاجز.
 class CheckpointDetailScreen extends StatefulWidget {
-  const CheckpointDetailScreen({super.key, required this.initialCheckpoint});
+  const CheckpointDetailScreen({
+    super.key,
+    required this.initialCheckpoint,
+    this.bypassProximityCheck = false,
+  });
 
   final Checkpoint initialCheckpoint;
+
+  /// لوحة الإدارة: إرسال تحديث دون شرط القرب من الحاجز.
+  final bool bypassProximityCheck;
 
   @override
   State<CheckpointDetailScreen> createState() => _CheckpointDetailScreenState();
@@ -85,7 +92,7 @@ class _CheckpointDetailScreenState extends State<CheckpointDetailScreen> {
 
   void _setTabIndex(int i) {
     setState(() => _tabIndex = i);
-    if (i == 1) {
+    if (i == 1 && !widget.bypassProximityCheck) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) {
           return;
@@ -125,11 +132,17 @@ class _CheckpointDetailScreenState extends State<CheckpointDetailScreen> {
                     context: context,
                     checkpoint: c,
                     direction: 'entrance',
+                    updateSource: widget.bypassProximityCheck
+                        ? CheckpointUpdateSource.admin
+                        : CheckpointUpdateSource.user,
                   ),
                   onExitBadgeTap: () => showCheckpointStatusSheet(
                     context: context,
                     checkpoint: c,
                     direction: 'exit',
+                    updateSource: widget.bypassProximityCheck
+                        ? CheckpointUpdateSource.admin
+                        : CheckpointUpdateSource.user,
                   ),
                 ),
               ),
@@ -149,7 +162,11 @@ class _CheckpointDetailScreenState extends State<CheckpointDetailScreen> {
                     index: _tabIndex,
                     children: <Widget>[
                       _LatestUpdatesPanel(checkpoint: c),
-                      _SendUpdatePanel(key: ValueKey<String>(c.id), checkpoint: c),
+                      _SendUpdatePanel(
+                        key: ValueKey<String>(c.id),
+                        checkpoint: c,
+                        bypassProximityCheck: widget.bypassProximityCheck,
+                      ),
                       _CheckpointInfoPanel(checkpoint: c),
                     ],
                   ),
@@ -270,6 +287,11 @@ class _CurrentStatusSummary extends StatelessWidget {
                 child: _StatusHalf(
                   title: _CheckpointDetailScreenState._entranceTitle(checkpoint),
                   updatedAt: checkpoint.entranceUpdatedAt,
+                  sourceFootnote: Checkpoint.isInAppUpdateSource(
+                        checkpoint.entranceSource,
+                      )
+                      ? '(تحديث من داخل التطبيق)'
+                      : null,
                   onBadgeTap: onEntranceBadgeTap,
                   statusWord: _CheckpointDetailScreenState._statusWord(
                     checkpoint.entranceStatus,
@@ -288,6 +310,11 @@ class _CurrentStatusSummary extends StatelessWidget {
                 child: _StatusHalf(
                   title: 'للخارج منها',
                   updatedAt: checkpoint.exitUpdatedAt,
+                  sourceFootnote: Checkpoint.isInAppUpdateSource(
+                        checkpoint.exitSource,
+                      )
+                      ? '(تحديث من داخل التطبيق)'
+                      : null,
                   onBadgeTap: onExitBadgeTap,
                   statusWord: _CheckpointDetailScreenState._statusWord(
                     checkpoint.exitStatus,
@@ -312,10 +339,12 @@ class _StatusHalf extends StatelessWidget {
     required this.onBadgeTap,
     required this.statusWord,
     required this.visual,
+    this.sourceFootnote,
   });
 
   final String title;
   final DateTime? updatedAt;
+  final String? sourceFootnote;
   final VoidCallback onBadgeTap;
   final String statusWord;
   final ({Color bg, Color fg, IconData icon}) visual;
@@ -377,6 +406,18 @@ class _StatusHalf extends StatelessWidget {
                 fontWeight: FontWeight.w500,
               ),
         ),
+        if (sourceFootnote != null) ...<Widget>[
+          const SizedBox(height: 4),
+          Text(
+            sourceFootnote!,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.white38,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 11,
+                ),
+          ),
+        ],
       ],
     );
   }
@@ -494,6 +535,30 @@ class _LatestUpdatesPanel extends StatelessWidget {
   List<_TimelineEntry> _buildEntries() {
     final String name =
         checkpoint.name.isEmpty ? 'الحاجز' : checkpoint.name.trim();
+    final List<CheckpointHistoryEntry> hist = checkpoint.statusHistory;
+
+    if (hist.isNotEmpty) {
+      const int maxEntries = 6;
+      return hist.take(maxEntries).map((CheckpointHistoryEntry e) {
+        final String wIn = _CheckpointDetailScreenState._statusWord(
+          e.entranceStatus,
+        );
+        final String wOut = _CheckpointDetailScreenState._statusWord(
+          e.exitStatus,
+        );
+        final String mainLine = wIn == wOut
+            ? '$name — $wIn'
+            : '$name — دخول: $wIn · خروج: $wOut';
+        return _TimelineEntry(
+          relativeTime: arabicRelativeSince(e.at),
+          bodyLines: <String>[mainLine],
+          footNote: Checkpoint.isInAppUpdateSource(e.source)
+              ? '(تحديث من داخل التطبيق)'
+              : null,
+        );
+      }).toList(growable: false);
+    }
+
     final String wIn = _CheckpointDetailScreenState._statusWord(
       checkpoint.entranceStatus,
     );
@@ -526,8 +591,7 @@ class _LatestUpdatesPanel extends StatelessWidget {
           _TimelineEntry(
             relativeTime: arabicRelativeSince(t),
             bodyLines: <String>[mainLine],
-            footNote:
-                arabicRelativeSince(t) == 'الآن' ? 'الآن' : null,
+            footNote: null,
           ),
         );
       } else {
@@ -695,7 +759,7 @@ class _TimelineCard extends StatelessWidget {
               entry.footNote!,
               textAlign: TextAlign.right,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: _successGreen,
+                    color: Colors.white54,
                     fontWeight: FontWeight.w600,
                   ),
             ),
@@ -767,9 +831,14 @@ _RoadTrafficOption _roadTrafficOptionFromCheckpoint(String raw) {
 }
 
 class _SendUpdatePanel extends StatefulWidget {
-  const _SendUpdatePanel({super.key, required this.checkpoint});
+  const _SendUpdatePanel({
+    super.key,
+    required this.checkpoint,
+    this.bypassProximityCheck = false,
+  });
 
   final Checkpoint checkpoint;
+  final bool bypassProximityCheck;
 
   @override
   State<_SendUpdatePanel> createState() => _SendUpdatePanelState();
@@ -826,6 +895,9 @@ class _SendUpdatePanelState extends State<_SendUpdatePanel> {
     if (_submitting) {
       return false;
     }
+    if (widget.bypassProximityCheck) {
+      return true;
+    }
     if (!c.hasCoordinates) {
       return true;
     }
@@ -851,8 +923,14 @@ class _SendUpdatePanelState extends State<_SendUpdatePanel> {
     final Checkpoint c = widget.checkpoint;
     setState(() => _submitting = true);
     try {
-      await provider.updateStatus(c.id, 'entrance', _entranceOption.repoStatus);
-      await provider.updateStatus(c.id, 'exit', _exitOption.repoStatus);
+      await provider.updateBothStatuses(
+        c.id,
+        entranceStatus: _entranceOption.repoStatus,
+        exitStatus: _exitOption.repoStatus,
+        source: widget.bypassProximityCheck
+            ? CheckpointUpdateSource.admin
+            : CheckpointUpdateSource.user,
+      );
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('تم إرسال التحديث')),
@@ -888,6 +966,7 @@ class _SendUpdatePanelState extends State<_SendUpdatePanel> {
               child: _ProximityBanner(
                 checkpoint: c,
                 location: loc,
+                bypassProximityCheck: widget.bypassProximityCheck,
                 onRefresh: () => loc.resolve(),
               ),
             ),
@@ -1013,11 +1092,13 @@ class _ProximityBanner extends StatelessWidget {
   const _ProximityBanner({
     required this.checkpoint,
     required this.location,
+    required this.bypassProximityCheck,
     required this.onRefresh,
   });
 
   final Checkpoint checkpoint;
   final UserLocationProvider location;
+  final bool bypassProximityCheck;
   final VoidCallback onRefresh;
 
   @override
@@ -1028,6 +1109,40 @@ class _ProximityBanner extends StatelessWidget {
     String message;
     bool showGreenCheck = false;
     bool messageIsWarningRed = false;
+
+    if (bypassProximityCheck) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF263238),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: _accentBlue.withValues(alpha: 0.35),
+          ),
+        ),
+        child: Row(
+          children: <Widget>[
+            const Icon(
+              Icons.admin_panel_settings_rounded,
+              color: _accentBlue,
+              size: 22,
+            ),
+            Expanded(
+              child: Text(
+                'وضع الإدارة — يمكن إرسال التحديث دون التحقق من موقعك أو المسافة.',
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.92),
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12.5,
+                  height: 1.35,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     if (!c.hasCoordinates) {
       message = 'لا تتوفر إحداثيات لهذا الحاجز — لا يمكن التحقق من المسافة.';

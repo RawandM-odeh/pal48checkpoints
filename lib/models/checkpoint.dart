@@ -3,7 +3,54 @@ import 'package:flutter/material.dart';
 
 import '../utils/geo_distance.dart';
 
-/// Firestore: directional statuses + timestamps (camelCase أو snake_case).
+/// مصدر كتابة الحالة في الخادم (لوحة الإدارة مقابل مستخدم التطبيق).
+enum CheckpointUpdateSource {
+  admin,
+  user,
+}
+
+/// عنصر واحد في سجل التحديثات المخزَّن في الوثيقة (حد أقصى 6 في الخادم).
+class CheckpointHistoryEntry {
+  const CheckpointHistoryEntry({
+    required this.at,
+    required this.entranceStatus,
+    required this.exitStatus,
+    required this.source,
+  });
+
+  final DateTime at;
+  final String entranceStatus;
+  final String exitStatus;
+
+  /// مصدر السجل في Firestore (مثل `app`، `admin`، `telegram`، …).
+  final String source;
+
+  static CheckpointHistoryEntry? tryParse(dynamic raw) {
+    if (raw == null) {
+      return null;
+    }
+    final Map<String, dynamic> map = raw is Map<String, dynamic>
+        ? raw
+        : Map<String, dynamic>.from(raw as Map);
+    final DateTime? at = Checkpoint._historyEntryDate(map['at']);
+    if (at == null) {
+      return null;
+    }
+    final ({String entrance, String exit}) dirs = Checkpoint.readDirections(map);
+    final String srcRaw =
+        (map['source'] is String ? (map['source'] as String).trim().toLowerCase() : '');
+    final String source = srcRaw.isNotEmpty ? srcRaw : 'admin';
+    return CheckpointHistoryEntry(
+      at: at,
+      entranceStatus: dirs.entrance,
+      exitStatus: dirs.exit,
+      source: source,
+    );
+  }
+}
+
+/// Firestore: canonical directional fields use snake_case (`entrance_status`, …);
+/// camelCase kept readable-only for older docs.
 /// الاسم: `name_ar` / `name` / `name_en` أو معرّف الوثيقة إن وُجد الاسم بالعربي كـ Doc ID.
 /// المدينة: حقل `city` أو النص في `location` (لا يُقرأ `GeoPoint` كمدينة).
 /// الإحداثيات: `latitude`/`longitude` أو `lat`/`lng` أو `geo` كـ [GeoPoint].
@@ -18,6 +65,9 @@ class Checkpoint {
     this.longitude,
     this.entranceUpdatedAt,
     this.exitUpdatedAt,
+    this.entranceSource,
+    this.exitSource,
+    this.statusHistory = const <CheckpointHistoryEntry>[],
   });
 
   final String id;
@@ -29,6 +79,15 @@ class Checkpoint {
   final String exitStatus;
   final DateTime? entranceUpdatedAt;
   final DateTime? exitUpdatedAt;
+
+  /// مصدر آخر تحديث للدخول (`telegram`، `app`، `admin`، …).
+  final String? entranceSource;
+
+  /// مصدر آخر تحديث للخروج.
+  final String? exitSource;
+
+  /// آخر التحديثات كما خُزّنت في `status_history` (الأحدث أولاً).
+  final List<CheckpointHistoryEntry> statusHistory;
 
   factory Checkpoint.fromDocument(
     QueryDocumentSnapshot<Map<String, dynamic>> doc,
@@ -51,7 +110,42 @@ class Checkpoint {
       exitStatus: dirs.exit,
       entranceUpdatedAt: times.entrance,
       exitUpdatedAt: times.exit,
+      entranceSource: _parseUpdateSource(map, const <String>[
+        'entrance_source',
+        'entranceSource',
+      ]),
+      exitSource: _parseUpdateSource(map, const <String>[
+        'exit_source',
+        'exitSource',
+      ]),
+      statusHistory: _parseStatusHistory(map['status_history'] ?? map['statusHistory']),
     );
+  }
+
+  static List<CheckpointHistoryEntry> _parseStatusHistory(dynamic value) {
+    if (value is! List) {
+      return const <CheckpointHistoryEntry>[];
+    }
+    final List<CheckpointHistoryEntry> out = <CheckpointHistoryEntry>[];
+    for (final Object? item in value) {
+      final CheckpointHistoryEntry? e = CheckpointHistoryEntry.tryParse(item);
+      if (e != null) {
+        out.add(e);
+      }
+    }
+    return List<CheckpointHistoryEntry>.unmodifiable(out);
+  }
+
+  static String? _parseUpdateSource(Map<String, dynamic> d, List<String> keys) {
+    final String? s = _firstNonEmptyString(d, keys);
+    if (s == null) {
+      return null;
+    }
+    return s.trim().toLowerCase();
+  }
+
+  static DateTime? _historyEntryDate(dynamic value) {
+    return _parseDate(value);
   }
 
   /// مسافة تقريبية بالكم؛ null إذا لم تُعرَف إحداثيات الحاجز.
@@ -69,6 +163,15 @@ class Checkpoint {
       longitude != null &&
       latitude!.isFinite &&
       longitude!.isFinite;
+
+  /// تحديث من التطبيق (وليس تليغرام أو مصدر خارجي آخر).
+  static bool isInAppUpdateSource(String? source) {
+    if (source == null) {
+      return false;
+    }
+    final String x = source.trim().toLowerCase();
+    return x == 'user' || x == 'app';
+  }
 
   /// إحداثيات من حقول شائعة أو [GeoPoint] تحت `geo` / `coordinates`.
   static ({double? lat, double? lng}) readCoordinates(Map<String, dynamic> map) {
@@ -131,12 +234,10 @@ class Checkpoint {
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
-      'name': name,
-      'location': location,
       if (latitude != null) 'latitude': latitude,
       if (longitude != null) 'longitude': longitude,
-      'entranceStatus': entranceStatus,
-      'exitStatus': exitStatus,
+      'entrance_status': CheckpointStatus.normalize(entranceStatus),
+      'exit_status': CheckpointStatus.normalize(exitStatus),
     };
   }
 
@@ -144,13 +245,13 @@ class Checkpoint {
     Map<String, dynamic> d,
   ) {
     final DateTime? entrance = _firstDate(d, const <String>[
-      'entranceUpdatedAt',
       'entrance_updated_at',
+      'entranceUpdatedAt',
       'updatedAt',
     ]);
     final DateTime? exit = _firstDate(d, const <String>[
-      'exitUpdatedAt',
       'exit_updated_at',
+      'exitUpdatedAt',
       'updatedAt',
     ]);
     return (entrance: entrance, exit: exit);
@@ -188,13 +289,13 @@ class Checkpoint {
         CheckpointStatus.normalize(_rawStatus(d['status']));
     final String entrance = CheckpointStatus.normalize(
       _directionalOrFallback(
-        _firstNonEmptyString(d, <String>['entranceStatus', 'entrance_status']),
+        _firstNonEmptyString(d, <String>['entrance_status', 'entranceStatus']),
         legacyFallback,
       ),
     );
     final String exit = CheckpointStatus.normalize(
       _directionalOrFallback(
-        _firstNonEmptyString(d, <String>['exitStatus', 'exit_status']),
+        _firstNonEmptyString(d, <String>['exit_status', 'exitStatus']),
         legacyFallback,
       ),
     );

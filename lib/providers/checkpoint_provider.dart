@@ -38,9 +38,24 @@ class CheckpointProvider extends ChangeNotifier {
   Future<void> updateStatus(
     String id,
     String direction,
-    String status,
-  ) {
-    return _repository.updateStatus(id, direction, status);
+    String status, {
+    CheckpointUpdateSource source = CheckpointUpdateSource.user,
+  }) {
+    return _repository.updateStatus(id, direction, status, source: source);
+  }
+
+  Future<void> updateBothStatuses(
+    String id, {
+    required String entranceStatus,
+    required String exitStatus,
+    CheckpointUpdateSource source = CheckpointUpdateSource.user,
+  }) {
+    return _repository.updateBothStatuses(
+      id,
+      entranceStatus: entranceStatus,
+      exitStatus: exitStatus,
+      source: source,
+    );
   }
 
   @override

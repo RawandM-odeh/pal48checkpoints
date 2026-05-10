@@ -21,26 +21,26 @@ function normalizeStatus(raw, fallback = "open") {
   return fallback;
 }
 
-/** Read entrance/exit; camelCase first, then snake_case; legacy `status` fallback. */
+/** Read entrance/exit; snake_case first, then camelCase; legacy `status` fallback. */
 function readDirections(data) {
   const legacyFallback = normalizeStatus(data.status);
 
   const entranceRaw =
-    typeof data.entranceStatus === "string" &&
-        data.entranceStatus.trim() !== "" ?
-      data.entranceStatus :
-      typeof data.entrance_status === "string" &&
-          data.entrance_status.trim() !== "" ?
-        data.entrance_status :
+    typeof data.entrance_status === "string" &&
+        data.entrance_status.trim() !== "" ?
+      data.entrance_status :
+      typeof data.entranceStatus === "string" &&
+          data.entranceStatus.trim() !== "" ?
+        data.entranceStatus :
         null;
 
   const exitRaw =
-    typeof data.exitStatus === "string" &&
-        data.exitStatus.trim() !== "" ?
-      data.exitStatus :
-      typeof data.exit_status === "string" &&
-          data.exit_status.trim() !== "" ?
-        data.exit_status :
+    typeof data.exit_status === "string" &&
+        data.exit_status.trim() !== "" ?
+      data.exit_status :
+      typeof data.exitStatus === "string" &&
+          data.exitStatus.trim() !== "" ?
+        data.exitStatus :
         null;
 
   const entrance = entranceRaw !== null ?
