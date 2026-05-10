@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/guest_browse_provider.dart';
@@ -21,7 +22,7 @@ import 'checkpoint_list.dart';
 import 'checkpoint_map_screen.dart';
 import 'saved_checkpoints_screen.dart';
 
-/// هيدر تركوزي + هيكل فاتح ناعم.
+/// هيدر علوي فاتح متناسق مع لون الصفحة واللوجو.
 abstract final class _PalUi {
   static const Color primaryBlue = AppColors.brandTeal;
   static const Color pageBg = AppColors.shellBackground;
@@ -800,56 +801,82 @@ class _BlueHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final double top = MediaQuery.paddingOf(context).top;
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: _PalUi.primaryBlue,
-        borderRadius: const BorderRadius.vertical(
-          bottom: Radius.circular(AppLayout.radiusXl),
-        ),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: _PalUi.primaryBlue.withValues(alpha: 0.35),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
+    final Color barTop = Color.lerp(Colors.white, AppColors.brandGlow, 0.35)!;
+    final Color barBottom = Color.lerp(
+      AppColors.shellSurfaceTint,
+      AppColors.shellBackground,
+      0.5,
+    )!;
+    final Color iconColor = AppColors.brandTealDark;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        statusBarBrightness: Brightness.light,
       ),
-      padding: EdgeInsets.fromLTRB(8, top + 8, 8, 18),
-      child: Stack(
-        alignment: Alignment.center,
-        children: <Widget>[
-          Align(
-            alignment: Alignment.centerLeft,
-            child: IconButton(
-              tooltip: 'المثبتة',
-              onPressed: onSavedPressed,
-              visualDensity: VisualDensity.compact,
-              constraints: const BoxConstraints(
-                minWidth: 42,
-                minHeight: 42,
-              ),
-              padding: EdgeInsets.zero,
-              icon: Icon(
-                savedHasBookmarks
-                    ? Icons.bookmark_rounded
-                    : Icons.bookmark_border_rounded,
-                color: Colors.white.withValues(alpha: 0.95),
-                size: 26,
-              ),
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: <Color>[barTop, barBottom],
+          ),
+          borderRadius: const BorderRadius.vertical(
+            bottom: Radius.circular(AppLayout.radiusXl),
+          ),
+          border: Border(
+            bottom: BorderSide(
+              color: AppColors.brandTeal.withValues(alpha: 0.12),
             ),
           ),
-          Text(
-            'وين رايح',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-              fontSize: 22,
-              letterSpacing: 0.5,
+          boxShadow: <BoxShadow>[
+            BoxShadow(
+              color: AppColors.brandTeal.withValues(alpha: 0.08),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
             ),
+          ],
+        ),
+        padding: EdgeInsets.fromLTRB(12, top + 8, 12, 8),
+        child: SizedBox(
+          height: 100,
+          child: Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
+            children: <Widget>[
+              Align(
+                alignment: Alignment.center,
+                child: Image.asset(
+                  'images/app_logo.png',
+                  height: 100,
+                  fit: BoxFit.contain,
+                  alignment: Alignment.center,
+                ),
+              ),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: IconButton(
+                  tooltip: 'المثبتة',
+                  onPressed: onSavedPressed,
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints(
+                    minWidth: 44,
+                    minHeight: 44,
+                  ),
+                  padding: EdgeInsets.zero,
+                  icon: Icon(
+                    savedHasBookmarks
+                        ? Icons.bookmark_rounded
+                        : Icons.bookmark_border_rounded,
+                    color: iconColor,
+                    size: 26,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
