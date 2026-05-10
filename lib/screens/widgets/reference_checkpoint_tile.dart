@@ -41,7 +41,7 @@ class ReferenceCheckpointTile extends StatelessWidget {
     required this.compact,
     required this.stripColor,
     required this.subtitle,
-    required this.onDirectionTap,
+    this.onDirectionTap,
     this.subtitleMaxLines = 6,
     this.onCardTap,
     this.isSaved = false,
@@ -53,7 +53,8 @@ class ReferenceCheckpointTile extends StatelessWidget {
   final Color stripColor;
   final String subtitle;
   final int subtitleMaxLines;
-  final void Function(String direction) onDirectionTap;
+  /// When null, entrance/exit badges are display-only (no status sheet).
+  final void Function(String direction)? onDirectionTap;
   final VoidCallback? onCardTap;
 
   /// «المثبتة»
@@ -167,14 +168,18 @@ class ReferenceCheckpointTile extends StatelessWidget {
                   label: 'للداخل',
                   status: checkpoint.entranceStatus,
                   compact: compact,
-                  onTap: () => onDirectionTap('entrance'),
+                  onTap: onDirectionTap == null
+                      ? null
+                      : () => onDirectionTap!('entrance'),
                 ),
                 SizedBox(height: compact ? 6 : 8),
                 _InboundOutboundBadge(
                   label: 'للخارج',
                   status: checkpoint.exitStatus,
                   compact: compact,
-                  onTap: () => onDirectionTap('exit'),
+                  onTap: onDirectionTap == null
+                      ? null
+                      : () => onDirectionTap!('exit'),
                 ),
               ],
             ),
@@ -204,13 +209,13 @@ class _InboundOutboundBadge extends StatelessWidget {
     required this.label,
     required this.status,
     required this.compact,
-    required this.onTap,
+    this.onTap,
   });
 
   final String label;
   final String status;
   final bool compact;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   static ({Color bg, Color fg, IconData icon, String text}) _style(String raw) {
     final String s = CheckpointStatus.normalize(raw);
@@ -261,6 +266,49 @@ class _InboundOutboundBadge extends StatelessWidget {
     );
     final double hPad = compact ? 8 : 10;
     final double vPad = compact ? 6 : 8;
+    final Widget statusPill = Container(
+      constraints: const BoxConstraints(minWidth: 108),
+      padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
+      decoration: BoxDecoration(
+        color: styl.bg,
+        borderRadius: BorderRadius.circular(AppLayout.radiusSm + 2),
+        border: Border.all(color: styl.fg.withValues(alpha: 0.14)),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: styl.fg.withValues(alpha: 0.08),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: <Widget>[
+          Icon(styl.icon, color: styl.fg, size: compact ? 15.5 : 17),
+          const SizedBox(width: 6),
+          Text(
+            styl.text,
+            style: TextStyle(
+              color: styl.fg,
+              fontWeight: FontWeight.w800,
+              fontSize: compact ? 12.5 : 13.5,
+              letterSpacing: -0.1,
+            ),
+          ),
+        ],
+      ),
+    );
+    final Widget statusDisplay = onTap == null
+        ? statusPill
+        : Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(AppLayout.radiusSm + 2),
+              child: statusPill,
+            ),
+          );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       mainAxisSize: MainAxisSize.min,
@@ -273,46 +321,7 @@ class _InboundOutboundBadge extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(AppLayout.radiusSm + 2),
-            child: Container(
-              constraints: const BoxConstraints(minWidth: 108),
-              padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
-              decoration: BoxDecoration(
-                color: styl.bg,
-                borderRadius: BorderRadius.circular(AppLayout.radiusSm + 2),
-                border: Border.all(color: styl.fg.withValues(alpha: 0.14)),
-                boxShadow: <BoxShadow>[
-                  BoxShadow(
-                    color: styl.fg.withValues(alpha: 0.08),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: <Widget>[
-                  Icon(styl.icon, color: styl.fg, size: compact ? 15.5 : 17),
-                  const SizedBox(width: 6),
-                  Text(
-                    styl.text,
-                    style: TextStyle(
-                      color: styl.fg,
-                      fontWeight: FontWeight.w800,
-                      fontSize: compact ? 12.5 : 13.5,
-                      letterSpacing: -0.1,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
+        statusDisplay,
       ],
     );
   }

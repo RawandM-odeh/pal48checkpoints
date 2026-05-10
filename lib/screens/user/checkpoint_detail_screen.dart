@@ -175,22 +175,22 @@ class _CheckpointDetailScreenState extends State<CheckpointDetailScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: _CurrentStatusSummary(
                   checkpoint: c,
-                  onEntranceBadgeTap: () => showCheckpointStatusSheet(
-                    context: context,
-                    checkpoint: c,
-                    direction: 'entrance',
-                    updateSource: widget.bypassProximityCheck
-                        ? CheckpointUpdateSource.admin
-                        : CheckpointUpdateSource.user,
-                  ),
-                  onExitBadgeTap: () => showCheckpointStatusSheet(
-                    context: context,
-                    checkpoint: c,
-                    direction: 'exit',
-                    updateSource: widget.bypassProximityCheck
-                        ? CheckpointUpdateSource.admin
-                        : CheckpointUpdateSource.user,
-                  ),
+                  onEntranceBadgeTap: widget.bypassProximityCheck
+                      ? () => showCheckpointStatusSheet(
+                            context: context,
+                            checkpoint: c,
+                            direction: 'entrance',
+                            updateSource: CheckpointUpdateSource.admin,
+                          )
+                      : null,
+                  onExitBadgeTap: widget.bypassProximityCheck
+                      ? () => showCheckpointStatusSheet(
+                            context: context,
+                            checkpoint: c,
+                            direction: 'exit',
+                            updateSource: CheckpointUpdateSource.admin,
+                          )
+                      : null,
                 ),
               ),
               const SizedBox(height: 14),
@@ -314,13 +314,14 @@ class _RoundIconButton extends StatelessWidget {
 class _CurrentStatusSummary extends StatelessWidget {
   const _CurrentStatusSummary({
     required this.checkpoint,
-    required this.onEntranceBadgeTap,
-    required this.onExitBadgeTap,
+    this.onEntranceBadgeTap,
+    this.onExitBadgeTap,
   });
 
   final Checkpoint checkpoint;
-  final VoidCallback onEntranceBadgeTap;
-  final VoidCallback onExitBadgeTap;
+  /// Null → badge is display-only (normal users); admin passes a tap handler.
+  final VoidCallback? onEntranceBadgeTap;
+  final VoidCallback? onExitBadgeTap;
 
   @override
   Widget build(BuildContext context) {
@@ -386,7 +387,7 @@ class _StatusHalf extends StatelessWidget {
   const _StatusHalf({
     required this.title,
     required this.updatedAt,
-    required this.onBadgeTap,
+    this.onBadgeTap,
     required this.statusWord,
     required this.visual,
     this.sourceFootnote,
@@ -395,7 +396,7 @@ class _StatusHalf extends StatelessWidget {
   final String title;
   final DateTime? updatedAt;
   final String? sourceFootnote;
-  final VoidCallback onBadgeTap;
+  final VoidCallback? onBadgeTap;
   final String statusWord;
   final ({Color bg, Color fg, IconData icon}) visual;
 
@@ -417,12 +418,9 @@ class _StatusHalf extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         Center(
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: onBadgeTap,
-              borderRadius: BorderRadius.circular(14),
-              child: Container(
+          child: Builder(
+            builder: (BuildContext context) {
+              final Widget badge = Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 18,
                   vertical: 10,
@@ -446,8 +444,19 @@ class _StatusHalf extends StatelessWidget {
                     Icon(visual.icon, color: visual.fg, size: 20),
                   ],
                 ),
-              ),
-            ),
+              );
+              if (onBadgeTap == null) {
+                return badge;
+              }
+              return Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: onBadgeTap,
+                  borderRadius: BorderRadius.circular(14),
+                  child: badge,
+                ),
+              );
+            },
           ),
         ),
         const SizedBox(height: 8),
@@ -1029,6 +1038,7 @@ class _SendUpdatePanelState extends State<_SendUpdatePanel> {
   Widget build(BuildContext context) {
     final UserLocationProvider loc = context.watch<UserLocationProvider>();
     final Checkpoint c = widget.checkpoint;
+    final bool statusCirclesEnabled = _canSubmit(loc, c);
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(16),
@@ -1070,12 +1080,14 @@ class _SendUpdatePanelState extends State<_SendUpdatePanel> {
                   _DirectionStatusPicker(
                     heading: _entranceRowLabel(),
                     value: _entranceOption,
+                    enabled: statusCirclesEnabled,
                     onChanged: (v) => setState(() => _entranceOption = v),
                   ),
                   const SizedBox(height: 22),
                   _DirectionStatusPicker(
                     heading: 'للخارج ←',
                     value: _exitOption,
+                    enabled: statusCirclesEnabled,
                     onChanged: (v) => setState(() => _exitOption = v),
                   ),
                   const SizedBox(height: 22),
@@ -1317,11 +1329,13 @@ class _DirectionStatusPicker extends StatelessWidget {
   const _DirectionStatusPicker({
     required this.heading,
     required this.value,
+    required this.enabled,
     required this.onChanged,
   });
 
   final String heading;
   final _SendUpdateOption value;
+  final bool enabled;
   final ValueChanged<_SendUpdateOption> onChanged;
 
   static const List<_SendUpdateOption> _options = <_SendUpdateOption>[
@@ -1353,6 +1367,7 @@ class _DirectionStatusPicker extends StatelessWidget {
               child: _CircleStatusOption(
                 option: o,
                 selected: value == o,
+                enabled: enabled,
                 onTap: () => onChanged(o),
               ),
             );
@@ -1367,11 +1382,13 @@ class _CircleStatusOption extends StatelessWidget {
   const _CircleStatusOption({
     required this.option,
     required this.selected,
+    required this.enabled,
     required this.onTap,
   });
 
   final _SendUpdateOption option;
   final bool selected;
+  final bool enabled;
   final VoidCallback onTap;
 
   @override
@@ -1380,44 +1397,48 @@ class _CircleStatusOption extends StatelessWidget {
     final Color labelColor = selected
         ? AppColors.textPrimaryLight
         : AppColors.textMutedLight;
+    final Widget column = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+      child: Column(
+        children: <Widget>[
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: selected
+                  ? _accentBlue.withValues(alpha: 0.35)
+                  : _surfaceElevated,
+              border: Border.all(
+                color: selected ? _accentBlue : AppColors.borderSubtleLight,
+                width: selected ? 2 : 1,
+              ),
+            ),
+            child: Icon(option.icon, color: iconColor, size: 22),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            option.labelAr,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: labelColor,
+              fontSize: 9.5,
+              fontWeight: FontWeight.w700,
+              height: 1.15,
+            ),
+          ),
+        ],
+      ),
+    );
+    if (!enabled) {
+      return column;
+    }
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-        child: Column(
-          children: <Widget>[
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: selected
-                    ? _accentBlue.withValues(alpha: 0.35)
-                    : _surfaceElevated,
-                border: Border.all(
-                  color: selected ? _accentBlue : AppColors.borderSubtleLight,
-                  width: selected ? 2 : 1,
-                ),
-              ),
-              child: Icon(option.icon, color: iconColor, size: 22),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              option.labelAr,
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: labelColor,
-                fontSize: 9.5,
-                fontWeight: FontWeight.w700,
-                height: 1.15,
-              ),
-            ),
-          ],
-        ),
-      ),
+      child: column,
     );
   }
 }

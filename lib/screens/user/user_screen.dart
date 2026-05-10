@@ -19,7 +19,6 @@ import '../../utils/city_display_ar.dart';
 import '../../utils/guest_session.dart';
 import 'checkpoint_list.dart';
 import 'checkpoint_map_screen.dart';
-import 'checkpoint_update_picker_screen.dart';
 import 'saved_checkpoints_screen.dart';
 
 /// هيدر تركوزي + هيكل فاتح ناعم.
@@ -47,30 +46,6 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
 
   /// Anchor for the city popup menu ([showMenu]) near the city chip.
   final GlobalKey _cityMenuAnchorKey = GlobalKey();
-
-  /// شريط التنقل بخمس عُقد؛ [2] = «تحديث حالة حاجز» وليست شاشة.
-  static const int _kRailShareIndex = 2;
-
-  /// فهرس شاشة الإعدادات في [_bottomNavIndex] (0 رئيسية، 1 خريطة، 2 إشعارات، 3 إعدادات).
-  static const int _kSettingsScreenIndex = 3;
-
-  int _screenToRailIndex(int screenIndex) {
-    if (screenIndex < 2) {
-      return screenIndex;
-    }
-    return screenIndex + 1;
-  }
-
-  /// `null` يعني ضغط على زر تحديث حالة الحاجز.
-  int? _screenIndexFromRail(int railIndex) {
-    if (railIndex == _kRailShareIndex) {
-      return null;
-    }
-    if (railIndex < 2) {
-      return railIndex;
-    }
-    return railIndex - 1;
-  }
 
   @override
   void initState() {
@@ -597,35 +572,15 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
                     backgroundColor: Colors.transparent,
                     surfaceTintColor: Colors.transparent,
                     indicatorColor: _PalUi.primaryBlue.withValues(alpha: 0.24),
-                    selectedIndex: _screenToRailIndex(_bottomNavIndex),
+                    selectedIndex: _bottomNavIndex,
                     height: 78,
                     labelBehavior:
                         NavigationDestinationLabelBehavior.alwaysShow,
                     animationDuration: const Duration(milliseconds: 280),
                     onDestinationSelected: (int railIndex) {
-                      final int? nextScreen = _screenIndexFromRail(railIndex);
-                      if (nextScreen == null) {
-                        unawaited(
-                          Navigator.of(context).push<void>(
-                            MaterialPageRoute<void>(
-                              builder: (_) =>
-                                  const CheckpointUpdatePickerScreen(),
-                            ),
-                          ),
-                        );
-                        return;
-                      }
-                      if (nextScreen == _bottomNavIndex &&
-                          nextScreen == _kSettingsScreenIndex) {
-                        setState(() => _bottomNavIndex = 0);
-                        if (mounted && _nearestListMode) {
-                          context.read<UserLocationProvider>().resolve();
-                        }
-                        return;
-                      }
                       final int prev = _bottomNavIndex;
-                      setState(() => _bottomNavIndex = nextScreen);
-                      if (nextScreen == 0 &&
+                      setState(() => _bottomNavIndex = railIndex);
+                      if (railIndex == 0 &&
                           prev != 0 &&
                           mounted &&
                           _nearestListMode) {
@@ -650,11 +605,6 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
                           color: _PalUi.primaryBlue,
                         ),
                         label: 'خريطة',
-                      ),
-                      NavigationDestination(
-                        icon: _ShareNavIcon(selected: false),
-                        selectedIcon: _ShareNavIcon(selected: true),
-                        label: 'تحديث حالة حاجز',
                       ),
                       NavigationDestination(
                         icon: const Icon(
@@ -890,7 +840,7 @@ class _BlueHeader extends StatelessWidget {
             ),
           ),
           Text(
-            'غ وين رايح',
+            'وين رايح',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               color: Colors.white,
@@ -1166,39 +1116,6 @@ class _CityMenuPopupRow extends StatelessWidget {
               Icon(Icons.check_rounded, size: 20, color: _PalUi.primaryBlue),
             ],
           ],
-        ),
-      ),
-    );
-  }
-}
-
-/// أيقونة زر «تحديث حالة حاجز» داخل [NavigationBar] (بين الخريطة والإشعارات).
-class _ShareNavIcon extends StatelessWidget {
-  const _ShareNavIcon({required this.selected});
-
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: 'تحديث أو مشاركة حالة نقطة تفتيش',
-      button: true,
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: selected
-              ? _PalUi.primaryBlue.withValues(alpha: 0.22)
-              : _PalUi.primaryBlue.withValues(alpha: 0.12),
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: _PalUi.primaryBlue.withValues(alpha: selected ? 0.45 : 0.3),
-          ),
-        ),
-        child: Icon(
-          Icons.edit_note_rounded,
-          size: 23,
-          color: _PalUi.primaryBlue,
         ),
       ),
     );

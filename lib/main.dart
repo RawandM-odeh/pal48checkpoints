@@ -72,7 +72,7 @@ class CheckpointAppRoot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'تطبيق نقاط التفتيش',
+      title: 'سالك؟',
       debugShowCheckedModeBanner: false,
       locale: const Locale('ar'),
       supportedLocales: const <Locale>[Locale('ar')],
