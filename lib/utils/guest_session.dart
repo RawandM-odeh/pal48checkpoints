@@ -58,15 +58,6 @@ Future<bool> ensureCanMakeCheckpointChanges(BuildContext context) async {
   return false;
 }
 
-/// Same account requirement as checkpoint updates: skip-guest and anonymous users must sign in (e.g. Google) first.
-Future<bool> ensureLoggedInForFavorites(BuildContext context) async {
-  if (canUserMakeCheckpointWrites) {
-    return true;
-  }
-  await showLoginRequiredDialog(context);
-  return false;
-}
-
 /// حوار العربية لصفحة المثبتة والعلامة على البطاقات.
 Future<void> showSavedLoginRequiredDialog(BuildContext context) async {
   await showDialog<void>(

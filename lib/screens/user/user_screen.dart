@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/guest_browse_provider.dart';
@@ -21,9 +20,8 @@ import '../../utils/guest_session.dart';
 import 'checkpoint_list.dart';
 import 'checkpoint_map_screen.dart';
 import 'saved_checkpoints_screen.dart';
-import 'favorites_screen.dart';
 
-/// هيدر علوي فاتح + هيكل الصفحة الفاتح.
+/// هيدر تركوزي + هيكل فاتح ناعم.
 abstract final class _PalUi {
   static const Color primaryBlue = AppColors.brandTeal;
   static const Color pageBg = AppColors.shellBackground;
@@ -42,8 +40,6 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
   int _mainTab = 0;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
-  bool _compactCards = false;
-
   /// عرض «أقرب الحواجز» يعتمد على GPS؛ الافتراضي عرض كل الحواجز حسب المدينة.
   bool _nearestListMode = false;
   String? _cityFilter;
@@ -164,18 +160,6 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
     );
   }
 
-  Future<void> _openFavoritesIfAllowed() async {
-    if (!await ensureLoggedInForFavorites(context)) {
-      return;
-    }
-    if (!mounted) {
-      return;
-    }
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const FavoritesScreen()));
-  }
-
   Future<void> _openSavedCheckpointsScreen() async {
     if (!canUserMakeCheckpointWrites) {
       await showSavedLoginRequiredDialog(context);
@@ -287,39 +271,6 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
         _BlueHeader(
           savedHasBookmarks: saved.ids.isNotEmpty,
           onSavedPressed: () => unawaited(_openSavedCheckpointsScreen()),
-          onFavoritesPressed: () => unawaited(_openFavoritesIfAllowed()),
-          onMenuPressed: () async {
-            await showModalBottomSheet<void>(
-              context: context,
-              backgroundColor: AppColors.cardLight,
-              showDragHandle: true,
-              builder: (BuildContext bc) {
-                return Directionality(
-                  textDirection: TextDirection.rtl,
-                  child: SafeArea(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        ListTile(
-                          leading: const Icon(Icons.logout),
-                          title: const Text('تسجيل الخروج'),
-                          onTap: () async {
-                            Navigator.pop(bc);
-                            await AuthService().signOut();
-                            if (context.mounted) {
-                              await context
-                                  .read<GuestBrowseProvider>()
-                                  .exitGuestBrowse();
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            );
-          },
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(
@@ -446,7 +397,6 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
                               ? 'اختر مدينة'
                               : cityDisplayNameAr(_cityFilter!),
                           closestOn: _nearestListMode,
-                          compactOn: _compactCards,
                           onCityTap: () => unawaited(_openCityMenu(cities)),
                           onClosestTap: () {
                             final bool next = !_nearestListMode;
@@ -458,8 +408,6 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
                               loc.resolve();
                             }
                           },
-                          onCompactTap: () =>
-                              setState(() => _compactCards = !_compactCards),
                         ),
                       ),
                     ),
@@ -482,7 +430,6 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
                     }
                   },
                   searchQuery: _searchQuery,
-                  compactMode: _compactCards,
                   cityFilter: _cityFilter,
                 )
               : Center(
@@ -842,132 +789,67 @@ class _MergedInboxRow {
 
 class _BlueHeader extends StatelessWidget {
   const _BlueHeader({
-    required this.onMenuPressed,
-    required this.onFavoritesPressed,
     required this.savedHasBookmarks,
     required this.onSavedPressed,
   });
 
-  final VoidCallback onMenuPressed;
-  final VoidCallback onFavoritesPressed;
-
-  /// تمييز أيقونة «المثبتة» عند وجود عناصر محفوظة.
+  /// تمييز بصري عند وجود حواجز مثبّتة.
   final bool savedHasBookmarks;
   final VoidCallback onSavedPressed;
 
   @override
   Widget build(BuildContext context) {
     final double top = MediaQuery.paddingOf(context).top;
-    final Color barTop = Color.lerp(Colors.white, AppColors.brandGlow, 0.35)!;
-    final Color barBottom = Color.lerp(
-      AppColors.shellSurfaceTint,
-      AppColors.shellBackground,
-      0.5,
-    )!;
-    final Color iconColor = AppColors.brandTealDark;
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        statusBarBrightness: Brightness.light,
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: _PalUi.primaryBlue,
+        borderRadius: const BorderRadius.vertical(
+          bottom: Radius.circular(AppLayout.radiusXl),
+        ),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: _PalUi.primaryBlue.withValues(alpha: 0.35),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
-      child: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: <Color>[barTop, barBottom],
-          ),
-          borderRadius: const BorderRadius.vertical(
-            bottom: Radius.circular(AppLayout.radiusXl),
-          ),
-          border: Border(
-            bottom: BorderSide(
-              color: AppColors.brandTeal.withValues(alpha: 0.12),
+      padding: EdgeInsets.fromLTRB(8, top + 8, 8, 18),
+      child: Stack(
+        alignment: Alignment.center,
+        children: <Widget>[
+          Align(
+            alignment: Alignment.centerLeft,
+            child: IconButton(
+              tooltip: 'المثبتة',
+              onPressed: onSavedPressed,
+              visualDensity: VisualDensity.compact,
+              constraints: const BoxConstraints(
+                minWidth: 42,
+                minHeight: 42,
+              ),
+              padding: EdgeInsets.zero,
+              icon: Icon(
+                savedHasBookmarks
+                    ? Icons.bookmark_rounded
+                    : Icons.bookmark_border_rounded,
+                color: Colors.white.withValues(alpha: 0.95),
+                size: 26,
+              ),
             ),
           ),
-          boxShadow: <BoxShadow>[
-            BoxShadow(
-              color: AppColors.brandTeal.withValues(alpha: 0.08),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
+          Text(
+            'غ وين رايح',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: 22,
+              letterSpacing: 0.5,
             ),
-          ],
-        ),
-        padding: EdgeInsets.fromLTRB(12, top + 8, 12, 8),
-        child: SizedBox(
-          height: 100,
-          child: Stack(
-            alignment: Alignment.center,
-            clipBehavior: Clip.none,
-            children: <Widget>[
-              Align(
-                alignment: Alignment.center,
-                child: Image.asset(
-                  'images/app_logo.png',
-                  height: 100,
-                  fit: BoxFit.contain,
-                  alignment: Alignment.center,
-                ),
-              ),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: <Widget>[
-                  IconButton(
-                    tooltip: 'قائمة',
-                    onPressed: onMenuPressed,
-                    icon: Icon(
-                      Icons.more_vert_rounded,
-                      color: iconColor,
-                      size: 26,
-                    ),
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    textDirection: TextDirection.ltr,
-                    children: <Widget>[
-                      IconButton(
-                        tooltip: 'المفضلة',
-                        onPressed: onFavoritesPressed,
-                        visualDensity: VisualDensity.compact,
-                        constraints: const BoxConstraints(
-                          minWidth: 44,
-                          minHeight: 44,
-                        ),
-                        padding: EdgeInsets.zero,
-                        icon: Icon(
-                          Icons.favorite_border_rounded,
-                          color: iconColor,
-                          size: 26,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      IconButton(
-                        tooltip: 'المثبتة',
-                        onPressed: onSavedPressed,
-                        visualDensity: VisualDensity.compact,
-                        constraints: const BoxConstraints(
-                          minWidth: 44,
-                          minHeight: 44,
-                        ),
-                        padding: EdgeInsets.zero,
-                        icon: Icon(
-                          savedHasBookmarks
-                              ? Icons.bookmark_rounded
-                              : Icons.bookmark_border_rounded,
-                          color: iconColor,
-                          size: 26,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
           ),
-        ),
+        ],
       ),
     );
   }
@@ -1076,19 +958,15 @@ class _FilterChipsRow extends StatelessWidget {
     required this.cityChipKey,
     required this.cityLabel,
     required this.closestOn,
-    required this.compactOn,
     required this.onCityTap,
     required this.onClosestTap,
-    required this.onCompactTap,
   });
 
   final Key cityChipKey;
   final String cityLabel;
   final bool closestOn;
-  final bool compactOn;
   final VoidCallback onCityTap;
   final VoidCallback onClosestTap;
-  final VoidCallback onCompactTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1108,13 +986,6 @@ class _FilterChipsRow extends StatelessWidget {
           label: 'الأقرب',
           selected: closestOn,
           onTap: onClosestTap,
-        ),
-        const SizedBox(width: 8),
-        _FilterChipButton(
-          icon: Icons.view_agenda_outlined,
-          label: 'مصغر',
-          selected: compactOn,
-          onTap: onCompactTap,
         ),
       ],
     );
@@ -1250,4 +1121,3 @@ class _CityMenuPopupRow extends StatelessWidget {
     );
   }
 }
-

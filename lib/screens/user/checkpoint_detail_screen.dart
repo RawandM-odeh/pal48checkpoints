@@ -6,7 +6,6 @@ import 'package:provider/provider.dart';
 import '../../models/checkpoint.dart';
 import '../../theme/app_colors.dart';
 import '../../providers/checkpoint_provider.dart';
-import '../../providers/favorite_checkpoints_provider.dart';
 import '../../providers/saved_checkpoints_provider.dart';
 import '../../providers/user_location_provider.dart';
 import '../../utils/ar_relative_time.dart';
@@ -131,20 +130,6 @@ class _CheckpointDetailScreenState extends State<CheckpointDetailScreen> {
     return 'للداخل إلى ${cityDisplayNameAr(loc)}';
   }
 
-  Future<void> _toggleFavoriteCheckpoint() async {
-    if (!await ensureLoggedInForFavorites(context)) {
-      return;
-    }
-    if (!mounted) {
-      return;
-    }
-    final CheckpointProvider cp = context.read<CheckpointProvider>();
-    final FavoriteCheckpointsProvider fv =
-        context.read<FavoriteCheckpointsProvider>();
-    final Checkpoint c = _resolveCheckpoint(cp);
-    fv.toggle(c.id);
-  }
-
   Future<void> _toggleSavedCheckpoint() async {
     if (!await ensureLoggedInForSaved(context)) {
       return;
@@ -167,8 +152,6 @@ class _CheckpointDetailScreenState extends State<CheckpointDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final CheckpointProvider cp = context.watch<CheckpointProvider>();
-    final FavoriteCheckpointsProvider fv = context
-        .watch<FavoriteCheckpointsProvider>();
     final SavedCheckpointsProvider sv = context.watch<SavedCheckpointsProvider>();
     final Checkpoint c = _resolveCheckpoint(cp);
     final String title = c.name.isEmpty ? 'بدون اسم' : c.name;
@@ -183,10 +166,8 @@ class _CheckpointDetailScreenState extends State<CheckpointDetailScreen> {
             children: <Widget>[
               _DetailHeader(
                 title: title,
-                isFavorite: fv.isFavorite(c.id),
                 isSaved: sv.isSaved(c.id),
                 onClose: () => Navigator.of(context).maybePop(),
-                onFavoriteToggle: () => unawaited(_toggleFavoriteCheckpoint()),
                 onSavedToggle: () => unawaited(_toggleSavedCheckpoint()),
               ),
               const SizedBox(height: 12),
@@ -249,18 +230,14 @@ class _CheckpointDetailScreenState extends State<CheckpointDetailScreen> {
 class _DetailHeader extends StatelessWidget {
   const _DetailHeader({
     required this.title,
-    required this.isFavorite,
     required this.isSaved,
     required this.onClose,
-    required this.onFavoriteToggle,
     required this.onSavedToggle,
   });
 
   final String title;
-  final bool isFavorite;
   final bool isSaved;
   final VoidCallback onClose;
-  final VoidCallback onFavoriteToggle;
   final VoidCallback onSavedToggle;
 
   @override
@@ -288,26 +265,14 @@ class _DetailHeader extends StatelessWidget {
               ),
             ),
           ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              _RoundIconButton(
-                backgroundColor:
-                    isSaved ? _accentBlue : _headerBarBg,
-                icon: isSaved
-                    ? Icons.bookmark_rounded
-                    : Icons.bookmark_outline_rounded,
-                iconColor: isSaved ? Colors.white : AppColors.textPrimaryLight,
-                onPressed: onSavedToggle,
-              ),
-              const SizedBox(width: 8),
-              _RoundIconButton(
-                backgroundColor: _accentBlue,
-                icon: isFavorite ? Icons.favorite : Icons.favorite_border,
-                iconColor: Colors.white,
-                onPressed: onFavoriteToggle,
-              ),
-            ],
+          _RoundIconButton(
+            backgroundColor:
+                isSaved ? _accentBlue : _headerBarBg,
+            icon: isSaved
+                ? Icons.bookmark_rounded
+                : Icons.bookmark_outline_rounded,
+            iconColor: isSaved ? Colors.white : AppColors.textPrimaryLight,
+            onPressed: onSavedToggle,
           ),
         ],
       ),
@@ -496,7 +461,7 @@ class _StatusHalf extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          arabicRelativeSince(updatedAt),
+          arabicRelativeOrClockSince(updatedAt),
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
             color: AppColors.textMutedLight,
@@ -647,7 +612,7 @@ class _LatestUpdatesPanel extends StatelessWidget {
                 ? '$name — $wIn'
                 : '$name — دخول: $wIn · خروج: $wOut';
             return _TimelineEntry(
-              relativeTime: arabicRelativeSince(e.at),
+              relativeTime: arabicRelativeOrClockSince(e.at),
               bodyLines: <String>[mainLine],
               footNote: Checkpoint.isInAppUpdateSource(e.source)
                   ? '(تحديث من داخل التطبيق)'
@@ -686,7 +651,7 @@ class _LatestUpdatesPanel extends StatelessWidget {
             : '$name — دخول: $wIn · خروج: $wOut';
         out.add(
           _TimelineEntry(
-            relativeTime: arabicRelativeSince(t),
+            relativeTime: arabicRelativeOrClockSince(t),
             bodyLines: <String>[mainLine],
             footNote: null,
           ),
@@ -695,14 +660,14 @@ class _LatestUpdatesPanel extends StatelessWidget {
         if (te.isAfter(tx)) {
           out.add(
             _TimelineEntry(
-              relativeTime: arabicRelativeSince(te),
+              relativeTime: arabicRelativeOrClockSince(te),
               bodyLines: <String>['$name — للداخل: $wIn'],
               footNote: null,
             ),
           );
           out.add(
             _TimelineEntry(
-              relativeTime: arabicRelativeSince(tx),
+              relativeTime: arabicRelativeOrClockSince(tx),
               bodyLines: <String>['$name — للخارج: $wOut'],
               footNote: null,
             ),
@@ -710,14 +675,14 @@ class _LatestUpdatesPanel extends StatelessWidget {
         } else {
           out.add(
             _TimelineEntry(
-              relativeTime: arabicRelativeSince(tx),
+              relativeTime: arabicRelativeOrClockSince(tx),
               bodyLines: <String>['$name — للخارج: $wOut'],
               footNote: null,
             ),
           );
           out.add(
             _TimelineEntry(
-              relativeTime: arabicRelativeSince(te),
+              relativeTime: arabicRelativeOrClockSince(te),
               bodyLines: <String>['$name — للداخل: $wIn'],
               footNote: null,
             ),
@@ -727,7 +692,7 @@ class _LatestUpdatesPanel extends StatelessWidget {
     } else if (te != null) {
       out.add(
         _TimelineEntry(
-          relativeTime: arabicRelativeSince(te),
+          relativeTime: arabicRelativeOrClockSince(te),
           bodyLines: <String>['$name — للداخل: $wIn'],
           footNote: null,
         ),
@@ -735,7 +700,7 @@ class _LatestUpdatesPanel extends StatelessWidget {
     } else {
       out.add(
         _TimelineEntry(
-          relativeTime: arabicRelativeSince(tx),
+          relativeTime: arabicRelativeOrClockSince(tx),
           bodyLines: <String>['$name — للخارج: $wOut'],
           footNote: null,
         ),

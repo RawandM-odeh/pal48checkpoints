@@ -9,7 +9,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'firebase_options.dart';
 import 'providers/checkpoint_provider.dart';
-import 'providers/favorite_checkpoints_provider.dart';
 import 'providers/guest_browse_provider.dart';
 import 'providers/saved_checkpoints_provider.dart';
 import 'providers/notification_provider.dart';
@@ -56,9 +55,6 @@ Future<void> main() async {
         ),
         ChangeNotifierProvider<GuestBrowseProvider>(
           create: (_) => GuestBrowseProvider(prefs),
-        ),
-        ChangeNotifierProvider<FavoriteCheckpointsProvider>(
-          create: (_) => FavoriteCheckpointsProvider(prefs, FirestoreService()),
         ),
         ChangeNotifierProvider<SavedCheckpointsProvider>(
           create: (_) =>

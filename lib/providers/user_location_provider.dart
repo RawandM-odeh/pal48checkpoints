@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 
+import '../utils/request_device_position.dart';
+
 /// موقع الجهاز الحالي لعرض الحواجز القريبة فقط.
 class UserLocationProvider extends ChangeNotifier {
   bool resolving = false;
@@ -60,42 +62,15 @@ class UserLocationProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        if (nearestModeActive) {
-          errorMessageAr =
-              'خدمات الموقع مغلقة. شغّل تحديد الموقع من إعدادات الجهاز ثم أعد المحاولة.';
-        }
+      final DeviceLocationResult r = await requestDeviceLocation();
+      if (!r.isSuccess) {
         position = null;
+        if (nearestModeActive) {
+          errorMessageAr = r.failureKind!.descriptionAr;
+        }
         return;
       }
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-      }
-      if (permission == LocationPermission.denied) {
-        if (nearestModeActive) {
-          errorMessageAr =
-              'لم يُسمح بالوصول للموقع. اسمح للتطبيق من الإعدادات لعرض الحواجز القريبة.';
-        }
-        position = null;
-        return;
-      }
-      if (permission == LocationPermission.deniedForever) {
-        if (nearestModeActive) {
-          errorMessageAr =
-              'تم رفض إذن الموقع بشكل دائم. افتح إعدادات التطبيق وفعّل الموقع.';
-        }
-        position = null;
-        return;
-      }
-
-      position = await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.medium,
-        ),
-      );
+      position = r.position;
       errorMessageAr = null;
       _attachPositionStream();
     } catch (e, st) {
@@ -103,7 +78,7 @@ class UserLocationProvider extends ChangeNotifier {
       position = null;
       if (nearestModeActive) {
         errorMessageAr =
-            'تعذّر تحديد موقعك. تأكد من الإنترنت والـ GPS ثم أعد المحاولة.';
+            DeviceLocationFailureKind.unavailable.descriptionAr;
       }
     } finally {
       resolving = false;
