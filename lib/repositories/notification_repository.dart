@@ -1,17 +1,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
+
+import '../models/stored_notification.dart';
 
 class NotificationRepository {
-  NotificationRepository({
-    FirebaseFirestore? firestore,
-    FirebaseFunctions? functions,
-  }) : _firestore = firestore ?? FirebaseFirestore.instance,
-       _functions = functions ?? FirebaseFunctions.instance;
+  NotificationRepository({FirebaseFirestore? firestore})
+      : _firestore = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _firestore;
-  final FirebaseFunctions _functions;
 
-  /// Persists a row in `notifications` for history / downstream triggers.
+  /// Persists a row in `notifications` for the in-app الإشعارات tab (no server push).
   Future<void> saveNotificationDocument({
     required String title,
     required String body,
@@ -23,17 +20,23 @@ class NotificationRepository {
     });
   }
 
-  /// Calls Cloud Function `sendBroadcastNotification`. Admin-only (enforced server-side).
-  Future<void> sendBroadcastToAllUsers({
-    required String title,
-    required String body,
-  }) async {
-    final HttpsCallable callable = _functions.httpsCallable(
-      'sendBroadcastNotification',
-    );
-    await callable.call<Map<String, dynamic>>(<String, dynamic>{
-      'title': title.trim(),
-      'body': body.trim(),
+  /// Newest admin announcements for the الإشعارات tab.
+  Stream<List<StoredNotification>> watchStoredNotifications({int limit = 100}) {
+    return _firestore
+        .collection('notifications')
+        .orderBy('sentAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map((QuerySnapshot<Map<String, dynamic>> snapshot) {
+      return snapshot.docs.map((QueryDocumentSnapshot<Map<String, dynamic>> d) {
+        final Map<String, dynamic> data = d.data();
+        return StoredNotification(
+          id: d.id,
+          title: (data['title'] as String?)?.trim() ?? '',
+          body: (data['body'] as String?)?.trim() ?? '',
+          sentAt: (data['sentAt'] as Timestamp?)?.toDate(),
+        );
+      }).toList(growable: false);
     });
   }
 }
