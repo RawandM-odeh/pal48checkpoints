@@ -30,9 +30,9 @@ class _SendNotificationTabState extends State<SendNotificationTab> {
     setState(() => _saving = true);
     try {
       await context.read<NotificationRepository>().saveNotificationDocument(
-            title: _titleCtrl.text,
-            body: _bodyCtrl.text,
-          );
+        title: _titleCtrl.text,
+        body: _bodyCtrl.text,
+      );
       if (!mounted) {
         return;
       }
@@ -122,8 +122,7 @@ class _SendNotificationTabState extends State<SendNotificationTab> {
                         dimension: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color:
-                              Theme.of(context).colorScheme.onPrimary,
+                          color: Theme.of(context).colorScheme.onPrimary,
                         ),
                       )
                     : const Icon(Icons.save_alt_rounded),

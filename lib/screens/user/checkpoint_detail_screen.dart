@@ -1,13 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/checkpoint.dart';
 import '../../theme/app_colors.dart';
 import '../../providers/checkpoint_provider.dart';
+import '../../providers/favorite_checkpoints_provider.dart';
+import '../../providers/saved_checkpoints_provider.dart';
 import '../../providers/user_location_provider.dart';
 import '../../utils/ar_relative_time.dart';
+import '../../utils/city_display_ar.dart';
 import '../../utils/guest_session.dart';
 import '../widgets/checkpoint_card.dart';
+import 'saved_checkpoints_screen.dart';
 
 /// واجهة فاتحة ناعمة متناغمة مع ثيم التطبيق.
 const Color _pageBg = AppColors.shellBackground;
@@ -24,6 +30,7 @@ class CheckpointDetailScreen extends StatefulWidget {
     super.key,
     required this.initialCheckpoint,
     this.bypassProximityCheck = false,
+    this.initialTabIndex = 0,
   });
 
   final Checkpoint initialCheckpoint;
@@ -31,13 +38,33 @@ class CheckpointDetailScreen extends StatefulWidget {
   /// لوحة الإدارة: إرسال تحديث دون شرط القرب من الحاجز.
   final bool bypassProximityCheck;
 
+  /// 0 آخر التحديثات، 1 أرسل تحديث، 2 معلومات الحاجز.
+  final int initialTabIndex;
+
   @override
   State<CheckpointDetailScreen> createState() => _CheckpointDetailScreenState();
 }
 
 class _CheckpointDetailScreenState extends State<CheckpointDetailScreen> {
-  int _tabIndex = 0;
-  bool _bookmarked = false;
+  late int _tabIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabIndex = widget.initialTabIndex.clamp(0, 2);
+    _scheduleLocationResolveIfNeeded();
+  }
+
+  void _scheduleLocationResolveIfNeeded() {
+    if (_tabIndex == 1 && !widget.bypassProximityCheck) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        context.read<UserLocationProvider>().resolve();
+      });
+    }
+  }
 
   Checkpoint _resolveCheckpoint(CheckpointProvider p) {
     for (final Checkpoint item in p.items) {
@@ -101,24 +128,48 @@ class _CheckpointDetailScreenState extends State<CheckpointDetailScreen> {
     if (loc.isEmpty) {
       return 'للداخل';
     }
-    return 'للداخل إلى $loc';
+    return 'للداخل إلى ${cityDisplayNameAr(loc)}';
+  }
+
+  Future<void> _toggleFavoriteCheckpoint() async {
+    if (!await ensureLoggedInForFavorites(context)) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    final CheckpointProvider cp = context.read<CheckpointProvider>();
+    final FavoriteCheckpointsProvider fv =
+        context.read<FavoriteCheckpointsProvider>();
+    final Checkpoint c = _resolveCheckpoint(cp);
+    fv.toggle(c.id);
+  }
+
+  Future<void> _toggleSavedCheckpoint() async {
+    if (!await ensureLoggedInForSaved(context)) {
+      return;
+    }
+    if (!mounted) {
+      return;
+    }
+    final CheckpointProvider cp = context.read<CheckpointProvider>();
+    final SavedCheckpointsProvider sv =
+        context.read<SavedCheckpointsProvider>();
+    final Checkpoint c = _resolveCheckpoint(cp);
+    sv.toggle(c.id);
   }
 
   void _setTabIndex(int i) {
     setState(() => _tabIndex = i);
-    if (i == 1 && !widget.bypassProximityCheck) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) {
-          return;
-        }
-        context.read<UserLocationProvider>().resolve();
-      });
-    }
+    _scheduleLocationResolveIfNeeded();
   }
 
   @override
   Widget build(BuildContext context) {
     final CheckpointProvider cp = context.watch<CheckpointProvider>();
+    final FavoriteCheckpointsProvider fv = context
+        .watch<FavoriteCheckpointsProvider>();
+    final SavedCheckpointsProvider sv = context.watch<SavedCheckpointsProvider>();
     final Checkpoint c = _resolveCheckpoint(cp);
     final String title = c.name.isEmpty ? 'بدون اسم' : c.name;
 
@@ -132,10 +183,11 @@ class _CheckpointDetailScreenState extends State<CheckpointDetailScreen> {
             children: <Widget>[
               _DetailHeader(
                 title: title,
-                bookmarked: _bookmarked,
+                isFavorite: fv.isFavorite(c.id),
+                isSaved: sv.isSaved(c.id),
                 onClose: () => Navigator.of(context).maybePop(),
-                onBookmarkToggle: () =>
-                    setState(() => _bookmarked = !_bookmarked),
+                onFavoriteToggle: () => unawaited(_toggleFavoriteCheckpoint()),
+                onSavedToggle: () => unawaited(_toggleSavedCheckpoint()),
               ),
               const SizedBox(height: 12),
               Padding(
@@ -197,15 +249,19 @@ class _CheckpointDetailScreenState extends State<CheckpointDetailScreen> {
 class _DetailHeader extends StatelessWidget {
   const _DetailHeader({
     required this.title,
-    required this.bookmarked,
+    required this.isFavorite,
+    required this.isSaved,
     required this.onClose,
-    required this.onBookmarkToggle,
+    required this.onFavoriteToggle,
+    required this.onSavedToggle,
   });
 
   final String title;
-  final bool bookmarked;
+  final bool isFavorite;
+  final bool isSaved;
   final VoidCallback onClose;
-  final VoidCallback onBookmarkToggle;
+  final VoidCallback onFavoriteToggle;
+  final VoidCallback onSavedToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -232,13 +288,26 @@ class _DetailHeader extends StatelessWidget {
               ),
             ),
           ),
-          _RoundIconButton(
-            backgroundColor: _accentBlue,
-            icon: bookmarked
-                ? Icons.bookmark_rounded
-                : Icons.bookmark_outline_rounded,
-            iconColor: Colors.white,
-            onPressed: onBookmarkToggle,
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              _RoundIconButton(
+                backgroundColor:
+                    isSaved ? _accentBlue : _headerBarBg,
+                icon: isSaved
+                    ? Icons.bookmark_rounded
+                    : Icons.bookmark_outline_rounded,
+                iconColor: isSaved ? Colors.white : AppColors.textPrimaryLight,
+                onPressed: onSavedToggle,
+              ),
+              const SizedBox(width: 8),
+              _RoundIconButton(
+                backgroundColor: _accentBlue,
+                icon: isFavorite ? Icons.favorite : Icons.favorite_border,
+                iconColor: Colors.white,
+                onPressed: onFavoriteToggle,
+              ),
+            ],
           ),
         ],
       ),
@@ -305,9 +374,8 @@ class _CurrentStatusSummary extends StatelessWidget {
                     checkpoint,
                   ),
                   updatedAt: checkpoint.entranceUpdatedAt,
-                  sourceFootnote: Checkpoint.isInAppUpdateSource(
-                        checkpoint.entranceSource,
-                      )
+                  sourceFootnote:
+                      Checkpoint.isInAppUpdateSource(checkpoint.entranceSource)
                       ? '(تحديث من داخل التطبيق)'
                       : null,
                   onBadgeTap: onEntranceBadgeTap,
@@ -328,9 +396,8 @@ class _CurrentStatusSummary extends StatelessWidget {
                 child: _StatusHalf(
                   title: 'للخارج منها',
                   updatedAt: checkpoint.exitUpdatedAt,
-                  sourceFootnote: Checkpoint.isInAppUpdateSource(
-                        checkpoint.exitSource,
-                      )
+                  sourceFootnote:
+                      Checkpoint.isInAppUpdateSource(checkpoint.exitSource)
                       ? '(تحديث من داخل التطبيق)'
                       : null,
                   onBadgeTap: onExitBadgeTap,
@@ -433,10 +500,10 @@ class _StatusHalf extends StatelessWidget {
             sourceFootnote!,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: AppColors.textMutedLight,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 11,
-                ),
+              color: AppColors.textMutedLight,
+              fontWeight: FontWeight.w600,
+              fontSize: 11,
+            ),
           ),
         ],
       ],
@@ -551,30 +618,34 @@ class _LatestUpdatesPanel extends StatelessWidget {
   final Checkpoint checkpoint;
 
   List<_TimelineEntry> _buildEntries() {
-    final String name =
-        checkpoint.name.isEmpty ? 'الحاجز' : checkpoint.name.trim();
+    final String name = checkpoint.name.isEmpty
+        ? 'الحاجز'
+        : checkpoint.name.trim();
     final List<CheckpointHistoryEntry> hist = checkpoint.statusHistory;
 
     if (hist.isNotEmpty) {
       const int maxEntries = 6;
-      return hist.take(maxEntries).map((CheckpointHistoryEntry e) {
-        final String wIn = _CheckpointDetailScreenState._statusWord(
-          e.entranceStatus,
-        );
-        final String wOut = _CheckpointDetailScreenState._statusWord(
-          e.exitStatus,
-        );
-        final String mainLine = wIn == wOut
-            ? '$name — $wIn'
-            : '$name — دخول: $wIn · خروج: $wOut';
-        return _TimelineEntry(
-          relativeTime: arabicRelativeSince(e.at),
-          bodyLines: <String>[mainLine],
-          footNote: Checkpoint.isInAppUpdateSource(e.source)
-              ? '(تحديث من داخل التطبيق)'
-              : null,
-        );
-      }).toList(growable: false);
+      return hist
+          .take(maxEntries)
+          .map((CheckpointHistoryEntry e) {
+            final String wIn = _CheckpointDetailScreenState._statusWord(
+              e.entranceStatus,
+            );
+            final String wOut = _CheckpointDetailScreenState._statusWord(
+              e.exitStatus,
+            );
+            final String mainLine = wIn == wOut
+                ? '$name — $wIn'
+                : '$name — دخول: $wIn · خروج: $wOut';
+            return _TimelineEntry(
+              relativeTime: arabicRelativeSince(e.at),
+              bodyLines: <String>[mainLine],
+              footNote: Checkpoint.isInAppUpdateSource(e.source)
+                  ? '(تحديث من داخل التطبيق)'
+                  : null,
+            );
+          })
+          .toList(growable: false);
     }
     final String wIn = _CheckpointDetailScreenState._statusWord(
       checkpoint.entranceStatus,
@@ -921,7 +992,7 @@ class _SendUpdatePanelState extends State<_SendUpdatePanel> {
     if (loc.isEmpty) {
       return 'للداخل ←';
     }
-    return '$loc ←';
+    return '${cityDisplayNameAr(loc)} ←';
   }
 
   bool _canSubmit(UserLocationProvider loc, Checkpoint c) {
@@ -1026,11 +1097,9 @@ class _SendUpdatePanelState extends State<_SendUpdatePanel> {
                   Text(
                     'اختر الحالة لكل اتجاه',
                     textAlign: TextAlign.center,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(
-                          color: AppColors.textMutedLight,
-                        ),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textMutedLight,
+                    ),
                   ),
                   const SizedBox(height: 20),
                   _DirectionStatusPicker(
@@ -1089,8 +1158,7 @@ class _SendUpdatePanelState extends State<_SendUpdatePanel> {
                           fontSize: 13,
                         ),
                         side: BorderSide(
-                          color:
-                              on ? _accentBlue : AppColors.borderSubtleLight,
+                          color: on ? _accentBlue : AppColors.borderSubtleLight,
                         ),
                       );
                     }),
@@ -1163,9 +1231,7 @@ class _ProximityBanner extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.shellSurfaceTint,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: _accentBlue.withValues(alpha: 0.35),
-          ),
+          border: Border.all(color: _accentBlue.withValues(alpha: 0.35)),
         ),
         child: Row(
           children: <Widget>[
@@ -1225,9 +1291,7 @@ class _ProximityBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFFFF9E8),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.amber.shade200,
-        ),
+        border: Border.all(color: Colors.amber.shade200),
       ),
       child: Row(
         children: <Widget>[
@@ -1347,9 +1411,7 @@ class _CircleStatusOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color iconColor = selected
-        ? Colors.white
-        : AppColors.textMutedLight;
+    final Color iconColor = selected ? Colors.white : AppColors.textMutedLight;
     final Color labelColor = selected
         ? AppColors.textPrimaryLight
         : AppColors.textMutedLight;
@@ -1369,9 +1431,7 @@ class _CircleStatusOption extends StatelessWidget {
                     ? _accentBlue.withValues(alpha: 0.35)
                     : _surfaceElevated,
                 border: Border.all(
-                  color: selected
-                      ? _accentBlue
-                      : AppColors.borderSubtleLight,
+                  color: selected ? _accentBlue : AppColors.borderSubtleLight,
                   width: selected ? 2 : 1,
                 ),
               ),
@@ -1467,9 +1527,23 @@ class _CheckpointInfoPanel extends StatelessWidget {
                         const SizedBox(width: 10),
                         Expanded(
                           child: _InfoActionTile(
-                            label: 'تم التثبيت',
+                            label: 'المثبتة',
                             icon: Icons.bookmark_rounded,
-                            onTap: () => _soon(context),
+                            onTap: () async {
+                              if (!canUserMakeCheckpointWrites) {
+                                await showSavedLoginRequiredDialog(context);
+                                return;
+                              }
+                              if (!context.mounted) {
+                                return;
+                              }
+                              await Navigator.of(context).push<void>(
+                                MaterialPageRoute<void>(
+                                  builder: (_) =>
+                                      const SavedCheckpointsScreen(),
+                                ),
+                              );
+                            },
                             solidBlueIconCircle: true,
                           ),
                         ),

@@ -9,7 +9,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'firebase_options.dart';
 import 'providers/checkpoint_provider.dart';
+import 'providers/favorite_checkpoints_provider.dart';
 import 'providers/guest_browse_provider.dart';
+import 'providers/saved_checkpoints_provider.dart';
 import 'providers/notification_provider.dart';
 import 'providers/user_location_provider.dart';
 import 'repositories/checkpoint_repository.dart';
@@ -23,16 +25,12 @@ import 'theme/app_theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   final NotificationProvider notificationProvider = NotificationProvider();
 
   if (!kIsWeb) {
-    FirebaseMessaging.onBackgroundMessage(
-      firebaseMessagingBackgroundHandler,
-    );
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
   }
 
   await NotificationService.initialize(notificationProvider);
@@ -42,9 +40,7 @@ Future<void> main() async {
   runApp(
     MultiProvider(
       providers: [
-        Provider<CheckpointRepository>(
-          create: (_) => CheckpointRepository(),
-        ),
+        Provider<CheckpointRepository>(create: (_) => CheckpointRepository()),
         Provider<NotificationRepository>(
           create: (_) => NotificationRepository(),
         ),
@@ -52,15 +48,21 @@ Future<void> main() async {
           value: notificationProvider,
         ),
         ChangeNotifierProvider<CheckpointProvider>(
-          create: (BuildContext context) => CheckpointProvider(
-            context.read<CheckpointRepository>(),
-          ),
+          create: (BuildContext context) =>
+              CheckpointProvider(context.read<CheckpointRepository>()),
         ),
         ChangeNotifierProvider<UserLocationProvider>(
           create: (_) => UserLocationProvider(),
         ),
         ChangeNotifierProvider<GuestBrowseProvider>(
           create: (_) => GuestBrowseProvider(prefs),
+        ),
+        ChangeNotifierProvider<FavoriteCheckpointsProvider>(
+          create: (_) => FavoriteCheckpointsProvider(prefs, FirestoreService()),
+        ),
+        ChangeNotifierProvider<SavedCheckpointsProvider>(
+          create: (_) =>
+              SavedCheckpointsProvider(FirestoreService()),
         ),
       ],
       child: const CheckpointAppRoot(),
@@ -122,19 +124,19 @@ class AuthGate extends StatelessWidget {
                 ),
                 builder:
                     (BuildContext context, AsyncSnapshot<String> roleSnapshot) {
-                  if (roleSnapshot.connectionState ==
-                      ConnectionState.waiting) {
-                    return const Scaffold(
-                      body: Center(child: CircularProgressIndicator()),
-                    );
-                  }
+                      if (roleSnapshot.connectionState ==
+                          ConnectionState.waiting) {
+                        return const Scaffold(
+                          body: Center(child: CircularProgressIndicator()),
+                        );
+                      }
 
-                  final String role = roleSnapshot.data ?? 'user';
-                  if (role == 'admin') {
-                    return const AdminScreen();
-                  }
-                  return const UserScreen();
-                },
+                      final String role = roleSnapshot.data ?? 'user';
+                      if (role == 'admin') {
+                        return const AdminScreen();
+                      }
+                      return const UserScreen();
+                    },
               );
             }
 

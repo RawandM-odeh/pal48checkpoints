@@ -316,9 +316,9 @@ class _StatusBadge extends StatelessWidget {
             CheckpointStatus.badgeLabelAr(status),
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: styl.fg,
-                  fontWeight: FontWeight.w700,
-                ),
+              color: styl.fg,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
       ),
@@ -368,9 +368,9 @@ Future<void> showCheckpointStatusSheet({
                   title,
                   textAlign: TextAlign.center,
                   style: Theme.of(bc).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimaryLight,
-                      ),
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimaryLight,
+                  ),
                 ),
                 const SizedBox(height: 14),
                 ConstrainedBox(
@@ -382,13 +382,16 @@ Future<void> showCheckpointStatusSheet({
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       mainAxisSize: MainAxisSize.min,
                       children: <Widget>[
-                        for (int i = 0;
-                            i < CheckpointStatus.all.length;
-                            i++) ...<Widget>[
+                        for (
+                          int i = 0;
+                          i < CheckpointStatus.all.length;
+                          i++
+                        ) ...<Widget>[
                           if (i > 0) const SizedBox(height: 10),
                           _SheetButton(
-                            label:
-                                CheckpointStatus.badgeLabelAr(CheckpointStatus.all[i]),
+                            label: CheckpointStatus.badgeLabelAr(
+                              CheckpointStatus.all[i],
+                            ),
                             status: CheckpointStatus.all[i],
                             onTap: () => _applyStatus(
                               bc,
@@ -432,15 +435,15 @@ Future<void> _applyStatus(
       source: updateSource,
     );
     if (parentContext.mounted) {
-      ScaffoldMessenger.of(parentContext).showSnackBar(
-        const SnackBar(content: Text('تم حفظ التحديث')),
-      );
+      ScaffoldMessenger.of(
+        parentContext,
+      ).showSnackBar(const SnackBar(content: Text('تم حفظ التحديث')));
     }
   } catch (e) {
     if (parentContext.mounted) {
-      ScaffoldMessenger.of(parentContext).showSnackBar(
-        SnackBar(content: Text('خطأ في الحفظ: $e')),
-      );
+      ScaffoldMessenger.of(
+        parentContext,
+      ).showSnackBar(SnackBar(content: Text('خطأ في الحفظ: $e')));
     }
   }
 }
