@@ -24,6 +24,10 @@ class SplitCheckpointPin extends StatelessWidget {
         return const Color(0xFFC62828);
       case CheckpointStatus.crowded:
         return const Color(0xFFF9A825);
+      case CheckpointStatus.armyPresent:
+        return const Color(0xFFF59E0B);
+      case CheckpointStatus.settlersPresent:
+        return const Color(0xFF9333EA);
       case CheckpointStatus.open:
       default:
         return const Color(0xFF2E7D32);

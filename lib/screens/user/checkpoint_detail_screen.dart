@@ -51,7 +51,11 @@ class _CheckpointDetailScreenState extends State<CheckpointDetailScreen> {
       case CheckpointStatus.closed:
         return 'مغلق';
       case CheckpointStatus.crowded:
-        return 'مزدحم';
+        return 'أزمة';
+      case CheckpointStatus.armyPresent:
+        return 'جيش';
+      case CheckpointStatus.settlersPresent:
+        return 'مستوطنون';
       case CheckpointStatus.open:
       default:
         return 'سالك';
@@ -70,15 +74,23 @@ class _CheckpointDetailScreenState extends State<CheckpointDetailScreen> {
         return (
           bg: const Color(0xFFF9A825),
           fg: const Color(0xFF3E2723),
-          icon: Icons.groups_rounded,
+          icon: Icons.traffic_rounded,
+        );
+      case CheckpointStatus.armyPresent:
+        return (
+          bg: const Color(0xFFF59E0B),
+          fg: const Color(0xFF422006),
+          icon: Icons.military_tech_rounded,
+        );
+      case CheckpointStatus.settlersPresent:
+        return (
+          bg: const Color(0xFFC084FC),
+          fg: const Color(0xFF3B0764),
+          icon: Icons.home_work_rounded,
         );
       case CheckpointStatus.open:
       default:
-        return (
-          bg: _successGreen,
-          fg: Colors.white,
-          icon: Icons.check_rounded,
-        );
+        return (bg: _successGreen, fg: Colors.white, icon: Icons.check_rounded);
     }
   }
 
@@ -220,7 +232,9 @@ class _DetailHeader extends StatelessWidget {
           ),
           _RoundIconButton(
             backgroundColor: _accentBlue,
-            icon: bookmarked ? Icons.bookmark_rounded : Icons.bookmark_outline_rounded,
+            icon: bookmarked
+                ? Icons.bookmark_rounded
+                : Icons.bookmark_outline_rounded,
             iconColor: Colors.white,
             onPressed: onBookmarkToggle,
           ),
@@ -285,7 +299,9 @@ class _CurrentStatusSummary extends StatelessWidget {
             children: <Widget>[
               Expanded(
                 child: _StatusHalf(
-                  title: _CheckpointDetailScreenState._entranceTitle(checkpoint),
+                  title: _CheckpointDetailScreenState._entranceTitle(
+                    checkpoint,
+                  ),
                   updatedAt: checkpoint.entranceUpdatedAt,
                   sourceFootnote: Checkpoint.isInAppUpdateSource(
                         checkpoint.entranceSource,
@@ -360,10 +376,10 @@ class _StatusHalf extends StatelessWidget {
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: Colors.white.withValues(alpha: 0.88),
-                fontWeight: FontWeight.w700,
-                height: 1.25,
-              ),
+            color: Colors.white.withValues(alpha: 0.88),
+            fontWeight: FontWeight.w700,
+            height: 1.25,
+          ),
         ),
         const SizedBox(height: 10),
         Center(
@@ -373,7 +389,10 @@ class _StatusHalf extends StatelessWidget {
               onTap: onBadgeTap,
               borderRadius: BorderRadius.circular(14),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: visual.bg,
                   borderRadius: BorderRadius.circular(14),
@@ -402,9 +421,9 @@ class _StatusHalf extends StatelessWidget {
           arabicRelativeSince(updatedAt),
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.white54,
-                fontWeight: FontWeight.w500,
-              ),
+            color: Colors.white54,
+            fontWeight: FontWeight.w500,
+          ),
         ),
         if (sourceFootnote != null) ...<Widget>[
           const SizedBox(height: 4),
@@ -424,10 +443,7 @@ class _StatusHalf extends StatelessWidget {
 }
 
 class _TabPillsRow extends StatelessWidget {
-  const _TabPillsRow({
-    required this.selectedIndex,
-    required this.onChanged,
-  });
+  const _TabPillsRow({required this.selectedIndex, required this.onChanged});
 
   final int selectedIndex;
   final ValueChanged<int> onChanged;
@@ -558,7 +574,6 @@ class _LatestUpdatesPanel extends StatelessWidget {
         );
       }).toList(growable: false);
     }
-
     final String wIn = _CheckpointDetailScreenState._statusWord(
       checkpoint.entranceStatus,
     );
@@ -733,9 +748,9 @@ class _TimelineCard extends StatelessWidget {
             entry.relativeTime,
             textAlign: TextAlign.right,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.white54,
-                  fontWeight: FontWeight.w600,
-                ),
+              color: Colors.white54,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 8),
           ...entry.bodyLines.map(
@@ -759,9 +774,9 @@ class _TimelineCard extends StatelessWidget {
               entry.footNote!,
               textAlign: TextAlign.right,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.white54,
-                    fontWeight: FontWeight.w600,
-                  ),
+                color: _successGreen,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ],
@@ -770,63 +785,69 @@ class _TimelineCard extends StatelessWidget {
   }
 }
 
-/// خيارات واجهة «أرسل تحديث» — الوسط/الثقيل يُخزَّنان كـ crowded في الخادم.
-enum _RoadTrafficOption {
-  open,
-  moderateTraffic,
-  severeTraffic,
-  closed,
-}
+/// خيارات «أرسل تحديث» — تُطابق قيمَ [CheckpointStatus] في Firestore.
+enum _SendUpdateOption { open, crowded, closed, armyPresent, settlersPresent }
 
-extension on _RoadTrafficOption {
+extension on _SendUpdateOption {
   String get labelAr {
     switch (this) {
-      case _RoadTrafficOption.open:
+      case _SendUpdateOption.open:
         return 'سالك';
-      case _RoadTrafficOption.moderateTraffic:
-        return 'أزمة متوسطة';
-      case _RoadTrafficOption.severeTraffic:
-        return 'أزمة خانقة';
-      case _RoadTrafficOption.closed:
+      case _SendUpdateOption.crowded:
+        return 'أزمة';
+      case _SendUpdateOption.closed:
         return 'مغلق';
+      case _SendUpdateOption.armyPresent:
+        return 'جيش';
+      case _SendUpdateOption.settlersPresent:
+        return 'مستوطنون';
     }
   }
 
   IconData get icon {
     switch (this) {
-      case _RoadTrafficOption.open:
+      case _SendUpdateOption.open:
         return Icons.check_rounded;
-      case _RoadTrafficOption.moderateTraffic:
-        return Icons.schedule_rounded;
-      case _RoadTrafficOption.severeTraffic:
-        return Icons.warning_amber_rounded;
-      case _RoadTrafficOption.closed:
+      case _SendUpdateOption.crowded:
+        return Icons.traffic_rounded;
+      case _SendUpdateOption.closed:
         return Icons.do_not_disturb_on_rounded;
+      case _SendUpdateOption.armyPresent:
+        return Icons.military_tech_rounded;
+      case _SendUpdateOption.settlersPresent:
+        return Icons.home_work_rounded;
     }
   }
 
   String get repoStatus {
     switch (this) {
-      case _RoadTrafficOption.closed:
+      case _SendUpdateOption.closed:
         return CheckpointStatus.closed;
-      case _RoadTrafficOption.open:
+      case _SendUpdateOption.open:
         return CheckpointStatus.open;
-      case _RoadTrafficOption.moderateTraffic:
-      case _RoadTrafficOption.severeTraffic:
+      case _SendUpdateOption.crowded:
         return CheckpointStatus.crowded;
+      case _SendUpdateOption.armyPresent:
+        return CheckpointStatus.armyPresent;
+      case _SendUpdateOption.settlersPresent:
+        return CheckpointStatus.settlersPresent;
     }
   }
 }
 
-_RoadTrafficOption _roadTrafficOptionFromCheckpoint(String raw) {
+_SendUpdateOption _sendUpdateOptionFromCheckpoint(String raw) {
   switch (CheckpointStatus.normalize(raw)) {
     case CheckpointStatus.closed:
-      return _RoadTrafficOption.closed;
+      return _SendUpdateOption.closed;
     case CheckpointStatus.crowded:
-      return _RoadTrafficOption.severeTraffic;
+      return _SendUpdateOption.crowded;
+    case CheckpointStatus.armyPresent:
+      return _SendUpdateOption.armyPresent;
+    case CheckpointStatus.settlersPresent:
+      return _SendUpdateOption.settlersPresent;
     case CheckpointStatus.open:
     default:
-      return _RoadTrafficOption.open;
+      return _SendUpdateOption.open;
   }
 }
 
@@ -845,12 +866,21 @@ class _SendUpdatePanel extends StatefulWidget {
 }
 
 class _SendUpdatePanelState extends State<_SendUpdatePanel> {
-  late _RoadTrafficOption _entranceOption;
-  late _RoadTrafficOption _exitOption;
+  late _SendUpdateOption _entranceOption;
+  late _SendUpdateOption _exitOption;
   final Set<String> _tags = <String>{};
   bool _submitting = false;
 
-  static const List<String> _tagLabels = <String>[
+  /// Canonical keys aligned with Arabic chip labels (same order as before).
+  static const List<String> _detailTagKeys = <String>[
+    CheckpointReportTag.inspection,
+    CheckpointReportTag.trafficAccident,
+    CheckpointReportTag.trafficDensity,
+    CheckpointReportTag.maintenance,
+    CheckpointReportTag.badWeather,
+  ];
+
+  static const List<String> _detailTagLabelsAr = <String>[
     'تفتيش',
     'حادث سير',
     'كثافة سير',
@@ -861,25 +891,26 @@ class _SendUpdatePanelState extends State<_SendUpdatePanel> {
   @override
   void initState() {
     super.initState();
-    _entranceOption = _roadTrafficOptionFromCheckpoint(
+    _entranceOption = _sendUpdateOptionFromCheckpoint(
       widget.checkpoint.entranceStatus,
     );
-    _exitOption = _roadTrafficOptionFromCheckpoint(
-      widget.checkpoint.exitStatus,
-    );
+    _exitOption = _sendUpdateOptionFromCheckpoint(widget.checkpoint.exitStatus);
+    _tags.addAll(widget.checkpoint.reportTags);
   }
 
   @override
   void didUpdateWidget(covariant _SendUpdatePanel oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.checkpoint.id != widget.checkpoint.id) {
-      _entranceOption = _roadTrafficOptionFromCheckpoint(
+      _entranceOption = _sendUpdateOptionFromCheckpoint(
         widget.checkpoint.entranceStatus,
       );
-      _exitOption = _roadTrafficOptionFromCheckpoint(
+      _exitOption = _sendUpdateOptionFromCheckpoint(
         widget.checkpoint.exitStatus,
       );
-      _tags.clear();
+      _tags
+        ..clear()
+        ..addAll(widget.checkpoint.reportTags);
     }
   }
 
@@ -927,20 +958,21 @@ class _SendUpdatePanelState extends State<_SendUpdatePanel> {
         c.id,
         entranceStatus: _entranceOption.repoStatus,
         exitStatus: _exitOption.repoStatus,
+        tags: _tags.toList(),
         source: widget.bypassProximityCheck
             ? CheckpointUpdateSource.admin
             : CheckpointUpdateSource.user,
       );
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تم إرسال التحديث')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('تم إرسال التحديث')));
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('تعذّر الإرسال: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('تعذّر الإرسال: $e')));
       }
     } finally {
       if (mounted) {
@@ -978,17 +1010,17 @@ class _SendUpdatePanelState extends State<_SendUpdatePanel> {
                     'شاركونا حالة الطريق 💛',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                        ),
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   Text(
                     'اختر الحالة لكل اتجاه',
                     textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.white54,
-                        ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: Colors.white54),
                   ),
                   const SizedBox(height: 20),
                   _DirectionStatusPicker(
@@ -1008,9 +1040,9 @@ class _SendUpdatePanelState extends State<_SendUpdatePanel> {
                     child: Text(
                       'تفاصيل إضافية:',
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                          ),
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 10),
@@ -1018,17 +1050,21 @@ class _SendUpdatePanelState extends State<_SendUpdatePanel> {
                     spacing: 8,
                     runSpacing: 8,
                     alignment: WrapAlignment.end,
-                    children: _tagLabels.map((String t) {
-                      final bool on = _tags.contains(t);
+                    children: List<Widget>.generate(_detailTagKeys.length, (
+                      int i,
+                    ) {
+                      final String key = _detailTagKeys[i];
+                      final String labelAr = _detailTagLabelsAr[i];
+                      final bool on = _tags.contains(key);
                       return FilterChip(
-                        label: Text(t),
+                        label: Text(labelAr),
                         selected: on,
                         onSelected: (bool v) {
                           setState(() {
                             if (v) {
-                              _tags.add(t);
+                              _tags.add(key);
                             } else {
-                              _tags.remove(t);
+                              _tags.remove(key);
                             }
                           });
                         },
@@ -1046,7 +1082,7 @@ class _SendUpdatePanelState extends State<_SendUpdatePanel> {
                               : Colors.white.withValues(alpha: 0.2),
                         ),
                       );
-                    }).toList(),
+                    }),
                   ),
                 ],
               ),
@@ -1157,8 +1193,10 @@ class _ProximityBanner extends StatelessWidget {
       message = 'اضغط «تحديث» لتحديد موقعك.';
       messageIsWarningRed = true;
     } else {
-      final double? d =
-          c.distanceKmFrom(loc.position!.latitude, loc.position!.longitude);
+      final double? d = c.distanceKmFrom(
+        loc.position!.latitude,
+        loc.position!.longitude,
+      );
       if (d == null) {
         message = 'تعذّر حساب المسافة.';
         messageIsWarningRed = true;
@@ -1166,8 +1204,7 @@ class _ProximityBanner extends StatelessWidget {
         message = 'أنت ضمن نطاق $_kUpdateRadiusKm كم — يمكنك إرسال التحديث.';
         showGreenCheck = true;
       } else {
-        message =
-            'يجب أن تكون ضمن نطاق $_kUpdateRadiusKm كم للتحديث';
+        message = 'يجب أن تكون ضمن نطاق $_kUpdateRadiusKm كم للتحديث';
         messageIsWarningRed = true;
       }
     }
@@ -1184,7 +1221,11 @@ class _ProximityBanner extends StatelessWidget {
       child: Row(
         children: <Widget>[
           if (showGreenCheck)
-            const Icon(Icons.check_circle_rounded, color: _successGreen, size: 22)
+            const Icon(
+              Icons.check_circle_rounded,
+              color: _successGreen,
+              size: 22,
+            )
           else
             const SizedBox(width: 22),
           Expanded(
@@ -1221,7 +1262,10 @@ class _ProximityBanner extends StatelessWidget {
                     ),
                   )
                 : const Icon(Icons.refresh_rounded, size: 18),
-            label: const Text('تحديث', style: TextStyle(fontWeight: FontWeight.w700)),
+            label: const Text(
+              'تحديث',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
           ),
         ],
       ),
@@ -1237,14 +1281,15 @@ class _DirectionStatusPicker extends StatelessWidget {
   });
 
   final String heading;
-  final _RoadTrafficOption value;
-  final ValueChanged<_RoadTrafficOption> onChanged;
+  final _SendUpdateOption value;
+  final ValueChanged<_SendUpdateOption> onChanged;
 
-  static const List<_RoadTrafficOption> _options = <_RoadTrafficOption>[
-    _RoadTrafficOption.open,
-    _RoadTrafficOption.moderateTraffic,
-    _RoadTrafficOption.severeTraffic,
-    _RoadTrafficOption.closed,
+  static const List<_SendUpdateOption> _options = <_SendUpdateOption>[
+    _SendUpdateOption.open,
+    _SendUpdateOption.crowded,
+    _SendUpdateOption.closed,
+    _SendUpdateOption.armyPresent,
+    _SendUpdateOption.settlersPresent,
   ];
 
   @override
@@ -1256,14 +1301,14 @@ class _DirectionStatusPicker extends StatelessWidget {
           heading,
           textAlign: TextAlign.right,
           style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: Colors.white.withValues(alpha: 0.92),
-                fontWeight: FontWeight.w800,
-              ),
+            color: Colors.white.withValues(alpha: 0.92),
+            fontWeight: FontWeight.w800,
+          ),
         ),
         const SizedBox(height: 12),
         Row(
           textDirection: TextDirection.rtl,
-          children: _options.map((_RoadTrafficOption o) {
+          children: _options.map((_SendUpdateOption o) {
             return Expanded(
               child: _CircleStatusOption(
                 option: o,
@@ -1285,16 +1330,18 @@ class _CircleStatusOption extends StatelessWidget {
     required this.onTap,
   });
 
-  final _RoadTrafficOption option;
+  final _SendUpdateOption option;
   final bool selected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final Color iconColor =
-        selected ? Colors.white : Colors.white.withValues(alpha: 0.45);
-    final Color labelColor =
-        selected ? Colors.white : Colors.white.withValues(alpha: 0.5);
+    final Color iconColor = selected
+        ? Colors.white
+        : Colors.white.withValues(alpha: 0.45);
+    final Color labelColor = selected
+        ? Colors.white
+        : Colors.white.withValues(alpha: 0.5);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -1303,8 +1350,8 @@ class _CircleStatusOption extends StatelessWidget {
         child: Column(
           children: <Widget>[
             Container(
-              width: 52,
-              height: 52,
+              width: 46,
+              height: 46,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: selected
@@ -1317,7 +1364,7 @@ class _CircleStatusOption extends StatelessWidget {
                   width: selected ? 2 : 1,
                 ),
               ),
-              child: Icon(option.icon, color: iconColor, size: 24),
+              child: Icon(option.icon, color: iconColor, size: 22),
             ),
             const SizedBox(height: 6),
             Text(
@@ -1327,7 +1374,7 @@ class _CircleStatusOption extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: labelColor,
-                fontSize: 10.5,
+                fontSize: 9.5,
                 fontWeight: FontWeight.w700,
                 height: 1.15,
               ),
@@ -1345,9 +1392,9 @@ class _CheckpointInfoPanel extends StatelessWidget {
   final Checkpoint checkpoint;
 
   void _soon(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('قريباً')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('قريباً')));
   }
 
   @override
@@ -1566,4 +1613,3 @@ class _InfoActionTile extends StatelessWidget {
     );
   }
 }
-

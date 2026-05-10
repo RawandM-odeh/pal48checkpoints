@@ -40,8 +40,15 @@ class CheckpointProvider extends ChangeNotifier {
     String direction,
     String status, {
     CheckpointUpdateSource source = CheckpointUpdateSource.user,
+    List<String>? tags,
   }) {
-    return _repository.updateStatus(id, direction, status, source: source);
+    return _repository.updateStatus(
+      id,
+      direction,
+      status,
+      source: source,
+      tags: tags,
+    );
   }
 
   Future<void> updateBothStatuses(
@@ -49,12 +56,14 @@ class CheckpointProvider extends ChangeNotifier {
     required String entranceStatus,
     required String exitStatus,
     CheckpointUpdateSource source = CheckpointUpdateSource.user,
+    List<String>? tags,
   }) {
     return _repository.updateBothStatuses(
       id,
       entranceStatus: entranceStatus,
       exitStatus: exitStatus,
       source: source,
+      tags: tags,
     );
   }
 
