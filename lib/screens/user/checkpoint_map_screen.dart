@@ -620,7 +620,8 @@ class _SplitLegendPreview extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          'مثال: لون كل نصف = حالة ذلك الاتجاه',
+          'كل نصف بلون حالة ذلك الاتجاه (سالك، أزمة، مغلق، جيش، مستوطنون)',
+          textAlign: TextAlign.right,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
                 color: Colors.white38,
                 fontSize: 10,

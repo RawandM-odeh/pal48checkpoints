@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../models/checkpoint.dart';
 
-/// Horizontal segment control: open / closed / crowded («مفتوح / مغلق / مزدحم»).
+/// شريحة حالات الدخول/الخروج — جميع قيم [CheckpointStatus.all].
 class DirectionStatusSegments extends StatelessWidget {
   const DirectionStatusSegments({
     super.key,
@@ -41,11 +41,15 @@ class DirectionStatusSegments extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 6),
-                    Text(
-                      CheckpointStatus.labelAr(s),
-                      maxLines: 1,
-                      overflow: TextOverflow.fade,
-                      softWrap: false,
+                    Flexible(
+                      child: Text(
+                        CheckpointStatus.labelAr(s),
+                        maxLines: 1,
+                        overflow: TextOverflow.fade,
+                        softWrap: false,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(fontSize: 11),
+                      ),
                     ),
                   ],
                 ),

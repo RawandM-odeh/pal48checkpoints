@@ -18,6 +18,7 @@ class Checkpoint {
     this.longitude,
     this.entranceUpdatedAt,
     this.exitUpdatedAt,
+    this.reportTags = const <String>[],
   });
 
   final String id;
@@ -30,6 +31,9 @@ class Checkpoint {
   final DateTime? entranceUpdatedAt;
   final DateTime? exitUpdatedAt;
 
+  /// User «تفاصيل إضافية» from Firestore (`reportTags` / optional `report_tags`).
+  final List<String> reportTags;
+
   factory Checkpoint.fromDocument(
     QueryDocumentSnapshot<Map<String, dynamic>> doc,
   ) {
@@ -38,8 +42,9 @@ class Checkpoint {
 
   factory Checkpoint.fromMap(String id, Map<String, dynamic> map) {
     final ({String entrance, String exit}) dirs = readDirections(map);
-    final ({DateTime? entrance, DateTime? exit}) times =
-        _parseDirectionTimes(map);
+    final ({DateTime? entrance, DateTime? exit}) times = _parseDirectionTimes(
+      map,
+    );
     final ({double? lat, double? lng}) coords = readCoordinates(map);
     return Checkpoint(
       id: id,
@@ -51,6 +56,7 @@ class Checkpoint {
       exitStatus: dirs.exit,
       entranceUpdatedAt: times.entrance,
       exitUpdatedAt: times.exit,
+      reportTags: readReportTags(map),
     );
   }
 
@@ -71,14 +77,17 @@ class Checkpoint {
       longitude!.isFinite;
 
   /// إحداثيات من حقول شائعة أو [GeoPoint] تحت `geo` / `coordinates`.
-  static ({double? lat, double? lng}) readCoordinates(Map<String, dynamic> map) {
+  static ({double? lat, double? lng}) readCoordinates(
+    Map<String, dynamic> map,
+  ) {
     final Object? g = map['geo'] ?? map['coordinates'];
     if (g is GeoPoint) {
       return (lat: g.latitude, lng: g.longitude);
     }
-    final double? lat = _readCoordinate(map['latitude']) ??
-        _readCoordinate(map['lat']);
-    final double? lng = _readCoordinate(map['longitude']) ??
+    final double? lat =
+        _readCoordinate(map['latitude']) ?? _readCoordinate(map['lat']);
+    final double? lng =
+        _readCoordinate(map['longitude']) ??
         _readCoordinate(map['lng']) ??
         _readCoordinate(map['lon']);
     return (lat: lat, lng: lng);
@@ -137,7 +146,26 @@ class Checkpoint {
       if (longitude != null) 'longitude': longitude,
       'entranceStatus': entranceStatus,
       'exitStatus': exitStatus,
+      if (reportTags.isNotEmpty) 'reportTags': List<String>.from(reportTags),
     };
+  }
+
+  /// Optional tags array; backwards-compatible when absent or malformed.
+  static List<String> readReportTags(Map<String, dynamic> map) {
+    final Object? raw = map['reportTags'] ?? map['report_tags'];
+    if (raw == null) {
+      return const <String>[];
+    }
+    if (raw is! Iterable<dynamic>) {
+      return const <String>[];
+    }
+    final List<String> buf = <String>[];
+    for (final Object? e in raw) {
+      if (e is String && e.trim().isNotEmpty) {
+        buf.add(e.trim());
+      }
+    }
+    return CheckpointReportTag.normalizeList(buf);
   }
 
   static ({DateTime? entrance, DateTime? exit}) _parseDirectionTimes(
@@ -184,8 +212,9 @@ class Checkpoint {
   static ({String entrance, String exit}) readDirections(
     Map<String, dynamic> d,
   ) {
-    final String legacyFallback =
-        CheckpointStatus.normalize(_rawStatus(d['status']));
+    final String legacyFallback = CheckpointStatus.normalize(
+      _rawStatus(d['status']),
+    );
     final String entrance = CheckpointStatus.normalize(
       _directionalOrFallback(
         _firstNonEmptyString(d, <String>['entranceStatus', 'entrance_status']),
@@ -229,15 +258,51 @@ class Checkpoint {
   }
 }
 
+/// Keys stored under `reportTags` on checkpoint documents.
+abstract final class CheckpointReportTag {
+  static const String inspection = 'inspection';
+  static const String trafficAccident = 'traffic_accident';
+  static const String trafficDensity = 'traffic_density';
+  static const String maintenance = 'maintenance';
+  static const String badWeather = 'bad_weather';
+
+  static const List<String> allowedKeys = <String>[
+    inspection,
+    trafficAccident,
+    trafficDensity,
+    maintenance,
+    badWeather,
+  ];
+
+  static final Set<String> _allowed = allowedKeys.toSet();
+
+  static List<String> normalizeList(Iterable<String> values) {
+    final Set<String> out = <String>{};
+    for (final String s in values) {
+      final String t = s.trim().toLowerCase();
+      if (_allowed.contains(t)) {
+        out.add(t);
+      }
+    }
+    final List<String> list = out.toList()..sort();
+    return List<String>.unmodifiable(list);
+  }
+}
+
 abstract final class CheckpointStatus {
   static const String open = 'open';
   static const String closed = 'closed';
   static const String crowded = 'crowded';
+  static const String armyPresent = 'army_present';
+  static const String settlersPresent = 'settlers_present';
 
+  /// Canonical order for forms, segmented controls, and sheets.
   static const List<String> all = <String>[
     open,
-    closed,
     crowded,
+    closed,
+    armyPresent,
+    settlersPresent,
   ];
 
   static String normalize(String value) {
@@ -254,20 +319,28 @@ abstract final class CheckpointStatus {
       case CheckpointStatus.closed:
         return 'مغلق';
       case CheckpointStatus.crowded:
-        return 'مزدحم';
+        return 'أزمة';
+      case CheckpointStatus.armyPresent:
+        return 'جيش';
+      case CheckpointStatus.settlersPresent:
+        return 'مستوطنون';
       case CheckpointStatus.open:
       default:
         return 'مفتوح';
     }
   }
 
-  /// Badge copy for user cards: سالك ✓ / مغلق ✗ / مزدحم ~
+  /// Badge copy for user cards: سالك ✓ / مغلق ✗ / أزمة ~ / جيش / مستوطنون
   static String badgeLabelAr(String status) {
     switch (normalize(status)) {
       case CheckpointStatus.closed:
         return 'مغلق ✗';
       case CheckpointStatus.crowded:
-        return 'مزدحم ~';
+        return 'أزمة ~';
+      case CheckpointStatus.armyPresent:
+        return 'جيش ⚠';
+      case CheckpointStatus.settlersPresent:
+        return 'مستوطنون ⚠';
       case CheckpointStatus.open:
       default:
         return 'سالك ✓';
@@ -277,21 +350,16 @@ abstract final class CheckpointStatus {
   static ({Color bg, Color fg}) badgeColors(String status) {
     switch (normalize(status)) {
       case CheckpointStatus.closed:
-        return (
-          bg: const Color(0xFFFFE4E6),
-          fg: const Color(0xFFB91C1C),
-        );
+        return (bg: const Color(0xFFFFE4E6), fg: const Color(0xFFB91C1C));
       case CheckpointStatus.crowded:
-        return (
-          bg: const Color(0xFFFEF9C3),
-          fg: const Color(0xFFEA580C),
-        );
+        return (bg: const Color(0xFFFEF9C3), fg: const Color(0xFFEA580C));
+      case CheckpointStatus.armyPresent:
+        return (bg: const Color(0xFFFFF7D6), fg: const Color(0xFF92400E));
+      case CheckpointStatus.settlersPresent:
+        return (bg: const Color(0xFFF3E8FF), fg: const Color(0xFF7E22CE));
       case CheckpointStatus.open:
       default:
-        return (
-          bg: const Color(0xFFE5F7ED),
-          fg: const Color(0xFF166534),
-        );
+        return (bg: const Color(0xFFE5F7ED), fg: const Color(0xFF166534));
     }
   }
 
@@ -301,6 +369,10 @@ abstract final class CheckpointStatus {
         return Theme.of(context).colorScheme.error;
       case CheckpointStatus.crowded:
         return const Color(0xFFEA580C);
+      case CheckpointStatus.armyPresent:
+        return const Color(0xFFD97706);
+      case CheckpointStatus.settlersPresent:
+        return const Color(0xFF9333EA);
       case CheckpointStatus.open:
       default:
         return Colors.green.shade700;

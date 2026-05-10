@@ -15,6 +15,13 @@ Color checkpointStripColor(Checkpoint c) {
   if (e == CheckpointStatus.closed || x == CheckpointStatus.closed) {
     return const Color(0xFFE53935);
   }
+  if (e == CheckpointStatus.armyPresent || x == CheckpointStatus.armyPresent) {
+    return const Color(0xFFF59E0B);
+  }
+  if (e == CheckpointStatus.settlersPresent ||
+      x == CheckpointStatus.settlersPresent) {
+    return const Color(0xFF9333EA);
+  }
   if (e == CheckpointStatus.crowded || x == CheckpointStatus.crowded) {
     return const Color(0xFFFFA726);
   }
@@ -161,8 +168,24 @@ class _InboundOutboundBadge extends StatelessWidget {
       return (
         bg: const Color(0xFFF9A825),
         fg: const Color(0xFF3E2723),
-        icon: Icons.groups_rounded,
-        text: 'مزدحم',
+        icon: Icons.traffic_rounded,
+        text: 'أزمة',
+      );
+    }
+    if (s == CheckpointStatus.armyPresent) {
+      return (
+        bg: const Color(0xFFF59E0B),
+        fg: const Color(0xFF422006),
+        icon: Icons.military_tech_rounded,
+        text: 'جيش',
+      );
+    }
+    if (s == CheckpointStatus.settlersPresent) {
+      return (
+        bg: const Color(0xFFA855F7),
+        fg: const Color(0xFF3B0764),
+        icon: Icons.home_work_rounded,
+        text: 'مستوطنون',
       );
     }
     return (
