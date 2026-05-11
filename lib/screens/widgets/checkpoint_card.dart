@@ -166,11 +166,9 @@ class CheckpointCard extends StatelessWidget {
                   label: 'الدخول',
                   status: checkpoint.entranceStatus,
                   updatedAt: checkpoint.entranceUpdatedAt,
-                  sourceFootnote: Checkpoint.isInAppUpdateSource(
-                        checkpoint.entranceSource,
-                      )
-                      ? '(تحديث من داخل التطبيق)'
-                      : null,
+                  sourceFootnote: Checkpoint.updateSourceFootnoteAr(
+                    checkpoint.entranceSource,
+                  ),
                   onTap: () => onStatusBadgeTap('entrance'),
                 ),
               ),
@@ -188,11 +186,9 @@ class CheckpointCard extends StatelessWidget {
                   label: 'الخروج',
                   status: checkpoint.exitStatus,
                   updatedAt: checkpoint.exitUpdatedAt,
-                  sourceFootnote: Checkpoint.isInAppUpdateSource(
-                        checkpoint.exitSource,
-                      )
-                      ? '(تحديث من داخل التطبيق)'
-                      : null,
+                  sourceFootnote: Checkpoint.updateSourceFootnoteAr(
+                    checkpoint.exitSource,
+                  ),
                   onTap: () => onStatusBadgeTap('exit'),
                 ),
               ),

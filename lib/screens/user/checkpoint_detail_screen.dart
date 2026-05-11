@@ -340,10 +340,9 @@ class _CurrentStatusSummary extends StatelessWidget {
                     checkpoint,
                   ),
                   updatedAt: checkpoint.entranceUpdatedAt,
-                  sourceFootnote:
-                      Checkpoint.isInAppUpdateSource(checkpoint.entranceSource)
-                      ? '(تحديث من داخل التطبيق)'
-                      : null,
+                  sourceFootnote: Checkpoint.updateSourceFootnoteAr(
+                    checkpoint.entranceSource,
+                  ),
                   onBadgeTap: onEntranceBadgeTap,
                   statusWord: _CheckpointDetailScreenState._statusWord(
                     checkpoint.entranceStatus,
@@ -362,10 +361,9 @@ class _CurrentStatusSummary extends StatelessWidget {
                 child: _StatusHalf(
                   title: 'للخارج منها',
                   updatedAt: checkpoint.exitUpdatedAt,
-                  sourceFootnote:
-                      Checkpoint.isInAppUpdateSource(checkpoint.exitSource)
-                      ? '(تحديث من داخل التطبيق)'
-                      : null,
+                  sourceFootnote: Checkpoint.updateSourceFootnoteAr(
+                    checkpoint.exitSource,
+                  ),
                   onBadgeTap: onExitBadgeTap,
                   statusWord: _CheckpointDetailScreenState._statusWord(
                     checkpoint.exitStatus,
@@ -614,9 +612,7 @@ class _LatestUpdatesPanel extends StatelessWidget {
             return _TimelineEntry(
               relativeTime: arabicRelativeOrClockSince(e.at),
               bodyLines: <String>[mainLine],
-              footNote: Checkpoint.isInAppUpdateSource(e.source)
-                  ? '(تحديث من داخل التطبيق)'
-                  : null,
+              footNote: Checkpoint.updateSourceFootnoteAr(e.source),
             );
           })
           .toList(growable: false);

@@ -189,6 +189,21 @@ class Checkpoint {
     return x == 'user' || x == 'app';
   }
 
+  /// سطر ثانٍ تحت الحالة أو سجل التحديثات (تطبيق / تيلغرام).
+  static String? updateSourceFootnoteAr(String? source) {
+    if (source == null) {
+      return null;
+    }
+    final String x = source.trim().toLowerCase();
+    if (x == 'user' || x == 'app') {
+      return '(تحديث من داخل التطبيق)';
+    }
+    if (x == 'telegram') {
+      return '(تحديث من التيلغرام)';
+    }
+    return null;
+  }
+
   /// إحداثيات من حقول شائعة أو [GeoPoint] تحت `geo` / `coordinates`.
   static ({double? lat, double? lng}) readCoordinates(
     Map<String, dynamic> map,
