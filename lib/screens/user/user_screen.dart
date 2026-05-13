@@ -22,38 +22,55 @@ import 'checkpoint_list.dart';
 import 'checkpoint_map_screen.dart';
 import 'saved_checkpoints_screen.dart';
 
-/// هيدر علوي فاتح متناسق مع لون الصفحة واللوجو.
+/// ألوان ثابتة تُستعمل في الشاشة الرئيسية للمستخدم (لون التمييز، خلفية الصفحة، خلفية شريط التبديل).
+///
+/// أين في البرنامج: داخل هذا الملف فقط؛ في دالة تنسيق الألوان الفاتحة، وفي الشريط العلوي وما تحته.
 abstract final class _PalUi {
   static const Color primaryBlue = AppColors.brandTeal;
   static const Color pageBg = AppColors.shellBackground;
   static const Color segmentInactiveBg = AppColors.shellSegmentTrack;
 }
 
+/// الشاشة الرئيسية للمستخدم: شريط تنقّل سفلي (رئيسية، خريطة، إشعارات، إعدادات) ومحتوى يتغيّر حسب التبويب.
+///
+/// أين في البرنامج: من موجّه الدخول في ملف البداية الرئيسي للمشروع، للمستخدم المسجّل أو الضيف أو الحساب المجهول.
 class UserScreen extends StatefulWidget {
   const UserScreen({super.key});
 
+  /// تنشئ كائن الحالة الذي يحفظ رقم التبويب السفلي، نص البحث، وفلتر المدينة.
+  ///
+  /// أين تُستدعى: تلقائياً من إطار فلاتر مرة واحدة عند إنشاء الشاشة الرئيسية للمستخدم.
   @override
   State<UserScreen> createState() => _UserScreenState();
 }
 
+/// حالة الشاشة الرئيسية للمستخدم: تُحفظ فيها أرقام التبويب، البحث، فلتر المدينة، ووضع «عرض الأقرب حسب الموقع».
+///
+/// أين تُنشأ: فقط عند إنشاء الشاشة الرئيسية (من دالة إنشاء الحالة المربوطة بهذه الشاشة).
 class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
   int _bottomNavIndex = 0;
   int _mainTab = 0;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
-  /// عرض «أقرب الحواجز» يعتمد على GPS؛ الافتراضي عرض كل الحواجز حسب المدينة.
+  /// إذا وُضع على التشغيل: تعرض القائمة الحواجز الأقرب حسب موقع الجهاز. الافتراضي إيقاف، أي العرض حسب المدينة فقط.
   bool _nearestListMode = false;
   String? _cityFilter;
 
-  /// Anchor for the city popup menu ([showMenu]) near the city chip.
+  /// مفتاح يربط موضع زر «المدينة» بقائمة المدن المنبثقة حتى تظهر القائمة تحت الزر مباشرة.
   final GlobalKey _cityMenuAnchorKey = GlobalKey();
 
+  /// تسجيل هذه الشاشة كمراقب لدورة حياة التطبيق (مثلاً للعودة من الخلفية).
+  ///
+  /// أين تُستدعى: مرة واحدة عند إنشاء الحالة من إطار فلاتر.
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
   }
 
+  /// تحرير الموارد: إغلاق حقل البحث وإلغاء تسجيل المراقب حتى لا تبقى استدعاءات بعد إغلاق الشاشة.
+  ///
+  /// أين تُستدعى: من إطار فلاتر عند إزالة الشاشة من الشجرة.
   @override
   void dispose() {
     _searchController.dispose();
@@ -61,6 +78,9 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
     super.dispose();
   }
 
+  /// عند عودة التطبيق من الخلفية إلى المقدمة: إن كان وضع «الأقرب» مفعّلاً، يُعاد طلب موقع المستخدم لتحديث القائمة.
+  ///
+  /// أين تُستدعى: من النظام تلقائياً عند تغيّر حالة التطبيق (مثل العودة من تطبيق آخر).
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
@@ -69,6 +89,9 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
     }
   }
 
+  /// تبني ثيماً فاتحاً خاصاً بهذه الشاشة (ألوان النص، البطاقات، شريط التنقّل السفلي).
+  ///
+  /// أين تُستدعى: من دالة البناء في هذه الحالة، لتغليف هيكل الصفحة بمظهر موحّد.
   ThemeData _lightUserTheme(BuildContext base) {
     final ColorScheme scheme = ColorScheme.fromSeed(
       seedColor: _PalUi.primaryBlue,
@@ -161,6 +184,9 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
     );
   }
 
+  /// تفتح شاشة الحواجز التي حفظها المستخدم. إن لم يكن مسموحاً له بالحفظ، تظهر رسالة تطلب تسجيل الدخول.
+  ///
+  /// أين تُستدعى: من زر الإشارة المرجعية في الهيدر الأزرق عند الضغط على «المثبتة».
   Future<void> _openSavedCheckpointsScreen() async {
     if (!canUserMakeCheckpointWrites) {
       await showSavedLoginRequiredDialog(context);
@@ -174,12 +200,17 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
     );
   }
 
+  /// تمسح نص البحث وتفرغ المتغير المستخدم لتصفية قائمة الحواجز.
+  ///
+  /// أين تُستدعى: من زر الإغلاق بجانب حقل البحث في تبويب الرئيسية.
   void _clearSearch() {
     _searchController.clear();
     setState(() => _searchQuery = '');
   }
 
-  /// Compact popup menu next to the city chip (not a full-screen bottom sheet).
+  /// تعرض قائمة منبثقة بجانب زر المدينة: اختيار مدينة واحدة أو «كل المدن».
+  ///
+  /// أين تُستدعى: عند الضغط على شريحة المدينة بجانب البحث في تبويب الرئيسية.
   Future<void> _openCityMenu(List<String> cities) async {
     final BuildContext? anchorContext = _cityMenuAnchorKey.currentContext;
     if (anchorContext == null) {
@@ -249,6 +280,9 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
     });
   }
 
+  /// تبني محتوى تبويب «الرئيسية»: الشعار والهيدر، التبديل بين الحواجز ومحطات الوقود، البحث، الفلاتر، ثم القائمة أو نصاً مؤقتاً للوقود.
+  ///
+  /// أين تُستدعى: من دالة البناء في هذه الحالة عندما يكون التبويب السفلي على «الرئيسية».
   Widget _buildHomeBody(BuildContext context) {
     final CheckpointProvider cp = context.watch<CheckpointProvider>();
     final SavedCheckpointsProvider saved = context
@@ -450,6 +484,9 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
     );
   }
 
+  /// إطار موحّد: عنوان في الأعلى ثم المحتوى يملأ باقي الشاشة (يُستعمل للخريطة والإشعارات والإعدادات).
+  ///
+  /// أين تُستدعى: من دالة البناء في هذه الحالة عند اختيار أحد التبويبات السفلية غير الرئيسية.
   Widget _buildSecondaryPane(String title, Widget body) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -475,6 +512,9 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
     );
   }
 
+  /// تبني الشاشة كاملة: اتجاه النص من اليمين لليسار، جسم يتبدّل حسب التبويب السفلي، وشريط التنقّل في الأسفل.
+  ///
+  /// أين تُستدعى: تلقائياً من إطار فلاتر عند رسم الشاشة الرئيسية للمستخدم.
   @override
   Widget build(BuildContext context) {
     final NotificationProvider inbox = context.watch<NotificationProvider>();
@@ -640,11 +680,17 @@ class _UserScreenState extends State<UserScreen> with WidgetsBindingObserver {
   }
 }
 
+/// محتوى تبويب «الإشعارات»: يجمع الإشعارات المحفوظة مع إشعارات المعاينة ويعرضها في قائمة.
+///
+/// أين تُستدعى: من دالة البناء في حالة الشاشة الرئيسية عندما يختار المستخدم تبويب الإشعارات في الأسفل.
 class _NotificationsBody extends StatelessWidget {
   const _NotificationsBody({required this.inbox});
 
   final NotificationProvider inbox;
 
+  /// تدمج قائمتين: إشعارات التطبيق الأمامي مع المخزّنة، وتزيل التكرار (بالمعرّف أو بنفس العنوان والنص).
+  ///
+  /// أين تُستدعى: من دالة البناء في جسم الإشعارات بعد وصول بيانات التدفّق من المستودع.
   static List<_MergedInboxRow> _merge(
     List<StoredNotification> stored,
     List<ForegroundInboxEntry> foreground,
@@ -676,6 +722,9 @@ class _NotificationsBody extends StatelessWidget {
     return merged;
   }
 
+  /// تستمع لتدفّق الإشعارات من قاعدة البيانات وتعرض: مؤشر تحميل، أو رسالة خطأ، أو القائمة، أو «لا توجد إشعارات».
+  ///
+  /// أين تُستدعى: تلقائياً من إطار فلاتر عند رسم جسم الإشعارات.
   @override
   Widget build(BuildContext context) {
     final NotificationRepository repo = context.read<NotificationRepository>();
@@ -767,13 +816,18 @@ class _NotificationsBody extends StatelessWidget {
   }
 }
 
+/// صف واحد في قائمة الإشعارات: عنوان، نص، وسطر إضافي اختياري (وقت الإرسال أو كلمة «الآن» للمعاينة).
+///
+/// أين تُستدعى: من دالة دمج الإشعارات ومن دالة بناء عناصر القائمة في تبويب الإشعارات.
 class _MergedInboxRow {
   _MergedInboxRow._({required this.title, required this.body, this.subtitle});
 
+  /// تُنشئ صفاً لإشعار ظهر أثناء تشغيل التطبيق؛ السطر الإضافي يكون «الآن».
   factory _MergedInboxRow.foreground(ForegroundInboxEntry e) {
     return _MergedInboxRow._(title: e.title, body: e.body, subtitle: 'الآن');
   }
 
+  /// تُنشئ صفاً لإشعار محفوظ؛ السطر الإضافي يعرض تاريخ ووقت الإرسال إن وُجد.
   factory _MergedInboxRow.stored(StoredNotification s) {
     final DateTime? t = s.sentAt;
     final String? sub = t != null
@@ -788,16 +842,22 @@ class _MergedInboxRow {
   final String? subtitle;
 }
 
+/// الشريط العلوي في الرئيسية: خلفية متدرّجة، شعار التطبيق، وزر الحواجز المحفوظة (المثبتة).
+///
+/// أين تُستدعى: من دالة محتوى الرئيسية في أعلى عمود المحتوى.
 class _BlueHeader extends StatelessWidget {
   const _BlueHeader({
     required this.savedHasBookmarks,
     required this.onSavedPressed,
   });
 
-  /// تمييز بصري عند وجود حواجز مثبّتة.
+  /// هل يوجد على الأقل حاجز واحد في قائمة المثبتة (يغيّر شكل أيقونة الإشارة المرجعية).
   final bool savedHasBookmarks;
   final VoidCallback onSavedPressed;
 
+  /// ترسم الخلفية المتدرّجة، شريط الحالة الشفاف، الشعار في الوسط، وزر المثبتة على الجانب.
+  ///
+  /// أين تُستدعى: تلقائياً من إطار فلاتر عند رسم الشريط العلوي للرئيسية.
   @override
   Widget build(BuildContext context) {
     final double top = MediaQuery.paddingOf(context).top;
@@ -882,6 +942,9 @@ class _BlueHeader extends StatelessWidget {
   }
 }
 
+/// مبدّل بين خيارين: «الحواجز والطرق» و«محطات الوقود» (شكل أزرار جنباً إلى جنب).
+///
+/// أين تُستدعى: من دالة محتوى الرئيسية داخل البطاقة أسفل الهيدر مباشرة.
 class _MainSegmentSwitch extends StatelessWidget {
   const _MainSegmentSwitch({
     required this.selectedIndex,
@@ -891,6 +954,9 @@ class _MainSegmentSwitch extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onChanged;
 
+  /// تعرض زرّين متجاورين؛ عند الضغط يُبلَّغ رقم الخيار الجديد (صفر للحواجز، واحد للوقود).
+  ///
+  /// أين تُستدعى: تلقائياً من إطار فلاتر عند رسم مبدّل الحواجز والوقود.
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -924,6 +990,9 @@ class _MainSegmentSwitch extends StatelessWidget {
   }
 }
 
+/// زر واحد داخل مبدّل الحواجز/الوقود: أيقونة ونص، يتغيّر لونه عندما يكون الخيار نشطاً.
+///
+/// أين تُستدعى: مرتين من دالة البناء في مبدّل الحواجز والوقود (مرة لكل خيار).
 class _SegmentTile extends StatelessWidget {
   const _SegmentTile({
     required this.icon,
@@ -937,6 +1006,9 @@ class _SegmentTile extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
+  /// ترسم الزر بلمسة الضغط والحدود الدائرية حسب حالة التحديد.
+  ///
+  /// أين تُستدعى: تلقائياً من إطار فلاتر عند رسم زر التبديل داخل المبدّل.
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -979,7 +1051,9 @@ class _SegmentTile extends StatelessWidget {
   }
 }
 
-/// Filter chips only (no scroll); parent supplies [SingleChildScrollView].
+/// صف يضم زرّين: اختيار المدينة (يفتح القائمة) و«الأقرب». التمرير الأفقي يكون من العنصر الأب إن لزم.
+///
+/// أين تُستدعى: من دالة محتوى الرئيسية بجانب حقل البحث في تبويب الحواجز.
 class _FilterChipsRow extends StatelessWidget {
   const _FilterChipsRow({
     required this.cityChipKey,
@@ -995,6 +1069,9 @@ class _FilterChipsRow extends StatelessWidget {
   final VoidCallback onCityTap;
   final VoidCallback onClosestTap;
 
+  /// تبني زرّي الفلترة (المدينة والأقرب) في صف واحد.
+  ///
+  /// أين تُستدعى: تلقائياً من إطار فلاتر عند رسم صف أزرار الفلترة.
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -1019,6 +1096,9 @@ class _FilterChipsRow extends StatelessWidget {
   }
 }
 
+/// زر فلترة على شكل حبة دواء: أيقونة ونص، يُستعمل لزر المدينة أو زر «الأقرب».
+///
+/// أين تُستدعى: من دالة البناء في صف أزرار الفلترة (مرتين: المدينة والأقرب).
 class _FilterChipButton extends StatelessWidget {
   const _FilterChipButton({
     super.key,
@@ -1033,6 +1113,9 @@ class _FilterChipButton extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
+  /// ترسم شكل الزر (حدود، ظل خفيف عند عدم التحديد، ولون مميز عند التحديد).
+  ///
+  /// أين تُستدعى: تلقائياً من إطار فلاتر عند رسم زر الفلترة.
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -1095,13 +1178,18 @@ class _FilterChipButton extends StatelessWidget {
   }
 }
 
-/// One row inside [showMenu] for city / «كل المدن».
+/// صف واحد داخل قائمة اختيار المدينة المنبثقة: نص المدينة وعلامة صح إذا كانت مختارة.
+///
+/// أين تُستدعى: من دالة قائمة المدن المنبثقة داخل كل عنصر من عناصر القائمة.
 class _CityMenuPopupRow extends StatelessWidget {
   const _CityMenuPopupRow({required this.label, required this.selected});
 
   final String label;
   final bool selected;
 
+  /// تعرض صف المدينة مع خلفية ملوّنة عندما يكون هذا الخيار هو المختار حالياً.
+  ///
+  /// أين تُستدعى: تلقائياً من إطار فلاتر عند رسم صف المدينة في القائمة المنبثقة.
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
