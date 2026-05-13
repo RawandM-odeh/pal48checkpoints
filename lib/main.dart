@@ -22,6 +22,11 @@ import 'services/firestore_service.dart';
 import 'services/notification_service.dart';
 import 'theme/app_theme.dart';
 
+/// نقطة بداية تشغيل التطبيق: تُنفَّذ مرة عند الإقلاع، ولا يُستحسن استدعاؤها يدوياً من شاشة أخرى.
+///
+/// ما يحدث بالترتيب: ربط التطبيق بخدمة السحابة، تجهيز الإشعارات، قراءة الإعدادات المحفوظة على الجهاز، ثم فتح الواجهة مع كل مزودي الحالة.
+///
+/// أين في المشروع: ضمن ملف البداية الرئيسي لهذا التطبيق فقط.
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -66,9 +71,17 @@ Future<void> main() async {
   );
 }
 
+/// الجذر العام للتطبيق: يضبط اللغة العربية وألوان الواجهة وعنوان التطبيق.
+///
+/// الوظيفة: يغلّف كل الشاشات في طبقة واحدة، ويجعل أول شاشة هي موجّه الدخول الذي يقرر شاشة المستخدم أو المشرف أو تسجيل الدخول.
+///
+/// أين يُستعمل: يُمرَّر كنفس الطبقة العليا بعد إعداد مزودي الحالة في دالة البداية أعلاه.
 class CheckpointAppRoot extends StatelessWidget {
   const CheckpointAppRoot({super.key});
 
+  /// تجهّز إعدادات الواجهة العامة: اللغة العربية، الألوان الفاتحة، وشاشة البداية.
+  ///
+  /// أين تُستدعى: تلقائياً من إطار فلاتر عند رسم الجذر العام للتطبيق.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -89,9 +102,17 @@ class CheckpointAppRoot extends StatelessWidget {
   }
 }
 
+/// بوابة اختيار الشاشة: تفتح تسجيل الدخول أو شاشة المستخدم أو شاشة المشرف حسب حالة الحساب.
+///
+/// الوظيفة: تتابع تغيّر حالة الدخول في الخلفية، تراعي التصفّح كضيف، وتسأل عن صلاحية المستخدم عند الدخول الكامل.
+///
+/// أين تُعرض: كأول محتوى بعد الجذر العام؛ أول ما يراه المستخدم بعد فتح التطبيق.
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
+  /// تختار الشاشة المناسبة: تسجيل الدخول، أو الشاشة الرئيسية للمستخدم، أو شاشة المشرف، حسب الجلسة ونوع الحساب.
+  ///
+  /// أين تُستدعى: تلقائياً من إطار فلاتر عند رسم بوابة اختيار الشاشة.
   @override
   Widget build(BuildContext context) {
     return Consumer<GuestBrowseProvider>(
