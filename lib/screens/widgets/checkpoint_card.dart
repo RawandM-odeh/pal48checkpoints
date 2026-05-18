@@ -29,12 +29,12 @@ enum CheckpointCardAppearance {
 }
 
 /// White rounded card showing entrance/exit status badges + relative times.
-/// Tapping a badge calls [onStatusBadgeTap] with `entrance` or `exit`.
+/// When [onStatusBadgeTap] is set, tapping a badge invokes it with `entrance` or `exit`.
 class CheckpointCard extends StatelessWidget {
   const CheckpointCard({
     super.key,
     required this.checkpoint,
-    required this.onStatusBadgeTap,
+    this.onStatusBadgeTap,
     this.trailing,
     this.headerEnd,
     this.footer,
@@ -45,7 +45,9 @@ class CheckpointCard extends StatelessWidget {
   });
 
   final Checkpoint checkpoint;
-  final void Function(String direction) onStatusBadgeTap;
+
+  /// When null, entrance/exit badges are display-only.
+  final void Function(String direction)? onStatusBadgeTap;
 
   /// When set (e.g. الصفَّين الرئيسيتين)، يقلّل ارتفاع منطقة الدخول/الخروج.
   final double? directionStripHeight;
@@ -169,7 +171,9 @@ class CheckpointCard extends StatelessWidget {
                   sourceFootnote: Checkpoint.updateSourceFootnoteAr(
                     checkpoint.entranceSource,
                   ),
-                  onTap: () => onStatusBadgeTap('entrance'),
+                  onTap: onStatusBadgeTap == null
+                      ? null
+                      : () => onStatusBadgeTap!('entrance'),
                 ),
               ),
               Padding(
@@ -189,7 +193,9 @@ class CheckpointCard extends StatelessWidget {
                   sourceFootnote: Checkpoint.updateSourceFootnoteAr(
                     checkpoint.exitSource,
                   ),
-                  onTap: () => onStatusBadgeTap('exit'),
+                  onTap: onStatusBadgeTap == null
+                      ? null
+                      : () => onStatusBadgeTap!('exit'),
                 ),
               ),
             ],
@@ -246,7 +252,7 @@ class _DirectionColumn extends StatelessWidget {
     required this.label,
     required this.status,
     required this.updatedAt,
-    required this.onTap,
+    this.onTap,
     this.sourceFootnote,
   });
 
@@ -254,7 +260,7 @@ class _DirectionColumn extends StatelessWidget {
   final String label;
   final String status;
   final DateTime? updatedAt;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final String? sourceFootnote;
 
   @override
@@ -339,35 +345,39 @@ class _DirectionColumn extends StatelessWidget {
 }
 
 class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.status, required this.onTap});
+  const _StatusBadge({required this.status, this.onTap});
 
   final String status;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final ({Color bg, Color fg}) styl = CheckpointStatus.badgeColors(status);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
+    final Widget badge = Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
           decoration: BoxDecoration(
             color: styl.bg,
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Text(
-            CheckpointStatus.badgeLabelAr(status),
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: styl.fg,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+      child: Text(
+        CheckpointStatus.badgeLabelAr(status),
+        textAlign: TextAlign.center,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          color: styl.fg,
+          fontWeight: FontWeight.w700,
         ),
+      ),
+    );
+    if (onTap == null) {
+      return badge;
+    }
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: badge,
       ),
     );
   }

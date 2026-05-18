@@ -15,7 +15,7 @@ import '../../utils/city_display_ar.dart';
 import '../../utils/geo_distance.dart';
 import '../../utils/request_device_position.dart';
 import '../../utils/guest_session.dart';
-import '../widgets/checkpoint_card.dart';
+import '../../utils/open_checkpoint_send_update.dart';
 import '../widgets/split_checkpoint_pin.dart';
 
 /// OSM tiles — راجع سياسة الاستخدام للإنتاج؛ للتطوير يكفي الخادم الافتراضي.
@@ -618,28 +618,26 @@ class _CheckpointMapScreenState extends State<CheckpointMapScreen> {
                       label: 'للداخل',
                       status: c.entranceStatus,
                       updated: c.entranceUpdatedAt,
-                      onTap: () async {
-                        Navigator.of(bc).pop();
-                        await showCheckpointStatusSheet(
-                          context: context,
-                          checkpoint: c,
-                          direction: 'entrance',
-                        );
-                      },
                     ),
                     const SizedBox(height: 10),
                     _SheetDirectionRow(
                       label: 'للخارج',
                       status: c.exitStatus,
                       updated: c.exitUpdatedAt,
-                      onTap: () async {
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      onPressed: () async {
                         Navigator.of(bc).pop();
-                        await showCheckpointStatusSheet(
-                          context: context,
-                          checkpoint: c,
-                          direction: 'exit',
-                        );
+                        await openCheckpointSendUpdate(context, c);
                       },
+                      icon: const Icon(Icons.edit_note_rounded),
+                      label: const Text('أرسل تحديث'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.brandTeal,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
                     ),
                   ],
                 );
@@ -1048,13 +1046,11 @@ class _SheetDirectionRow extends StatelessWidget {
     required this.label,
     required this.status,
     required this.updated,
-    required this.onTap,
   });
 
   final String label;
   final String status;
   final DateTime? updated;
-  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -1071,44 +1067,30 @@ class _SheetDirectionRow extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+          decoration: BoxDecoration(
+            color: styl.bg.withValues(alpha: 0.35),
             borderRadius: BorderRadius.circular(12),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-              decoration: BoxDecoration(
-                color: styl.bg.withValues(alpha: 0.35),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.borderSubtleLight),
+            border: Border.all(color: AppColors.borderSubtleLight),
+          ),
+          child: Column(
+            children: <Widget>[
+              Text(
+                CheckpointStatus.badgeLabelAr(status),
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: styl.fg,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
-              child: Column(
-                children: <Widget>[
-                  Text(
-                    CheckpointStatus.badgeLabelAr(status),
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: styl.fg,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    arabicRelativeSince(updated),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: AppColors.textMutedLight,
-                    ),
-                  ),
-                  Text(
-                    'اضغط لتغيير الحالة',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: AppColors.brandTeal,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
+              const SizedBox(height: 4),
+              Text(
+                arabicRelativeSince(updated),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppColors.textMutedLight,
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ],

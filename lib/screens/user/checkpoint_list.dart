@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
@@ -11,6 +13,7 @@ import '../../theme/app_layout.dart';
 import '../../utils/ar_relative_time.dart';
 import '../../utils/checkpoint_search.dart';
 import '../../utils/guest_session.dart';
+import '../../utils/open_checkpoint_send_update.dart';
 import '../widgets/checkpoint_card.dart';
 import 'checkpoint_detail_screen.dart';
 
@@ -179,13 +182,7 @@ class _CheckpointListState extends State<CheckpointList> {
                 : AppColors.textMutedLight,
           ),
         ),
-        onStatusBadgeTap: (String direction) {
-          showCheckpointStatusSheet(
-            context: context,
-            checkpoint: c,
-            direction: direction,
-          );
-        },
+        onStatusBadgeTap: (_) => unawaited(openCheckpointSendUpdate(context, c)),
         onCardTap: () {
           Navigator.of(context).push(
             MaterialPageRoute<void>(
