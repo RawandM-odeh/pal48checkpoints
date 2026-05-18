@@ -6,13 +6,11 @@ import 'package:provider/provider.dart';
 import '../../models/checkpoint.dart';
 import '../../theme/app_colors.dart';
 import '../../providers/checkpoint_provider.dart';
-import '../../providers/saved_checkpoints_provider.dart';
 import '../../providers/user_location_provider.dart';
 import '../../utils/ar_relative_time.dart';
 import '../../utils/city_display_ar.dart';
 import '../../utils/guest_session.dart';
 import '../widgets/checkpoint_card.dart';
-import 'saved_checkpoints_screen.dart';
 
 /// واجهة فاتحة ناعمة متناغمة مع ثيم التطبيق.
 const Color _pageBg = AppColors.shellBackground;
@@ -130,20 +128,6 @@ class _CheckpointDetailScreenState extends State<CheckpointDetailScreen> {
     return 'للداخل إلى ${cityDisplayNameAr(loc)}';
   }
 
-  Future<void> _toggleSavedCheckpoint() async {
-    if (!await ensureLoggedInForSaved(context)) {
-      return;
-    }
-    if (!mounted) {
-      return;
-    }
-    final CheckpointProvider cp = context.read<CheckpointProvider>();
-    final SavedCheckpointsProvider sv =
-        context.read<SavedCheckpointsProvider>();
-    final Checkpoint c = _resolveCheckpoint(cp);
-    sv.toggle(c.id);
-  }
-
   void _setTabIndex(int i) {
     setState(() => _tabIndex = i);
     _scheduleLocationResolveIfNeeded();
@@ -152,7 +136,6 @@ class _CheckpointDetailScreenState extends State<CheckpointDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final CheckpointProvider cp = context.watch<CheckpointProvider>();
-    final SavedCheckpointsProvider sv = context.watch<SavedCheckpointsProvider>();
     final Checkpoint c = _resolveCheckpoint(cp);
     final String title = c.name.isEmpty ? 'بدون اسم' : c.name;
 
@@ -166,9 +149,7 @@ class _CheckpointDetailScreenState extends State<CheckpointDetailScreen> {
             children: <Widget>[
               _DetailHeader(
                 title: title,
-                isSaved: sv.isSaved(c.id),
                 onClose: () => Navigator.of(context).maybePop(),
-                onSavedToggle: () => unawaited(_toggleSavedCheckpoint()),
               ),
               const SizedBox(height: 12),
               Padding(
@@ -230,15 +211,11 @@ class _CheckpointDetailScreenState extends State<CheckpointDetailScreen> {
 class _DetailHeader extends StatelessWidget {
   const _DetailHeader({
     required this.title,
-    required this.isSaved,
     required this.onClose,
-    required this.onSavedToggle,
   });
 
   final String title;
-  final bool isSaved;
   final VoidCallback onClose;
-  final VoidCallback onSavedToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -265,15 +242,7 @@ class _DetailHeader extends StatelessWidget {
               ),
             ),
           ),
-          _RoundIconButton(
-            backgroundColor:
-                isSaved ? _accentBlue : _headerBarBg,
-            icon: isSaved
-                ? Icons.bookmark_rounded
-                : Icons.bookmark_outline_rounded,
-            iconColor: isSaved ? Colors.white : AppColors.textPrimaryLight,
-            onPressed: onSavedToggle,
-          ),
+          const SizedBox(width: 44, height: 44),
         ],
       ),
     );
@@ -1447,7 +1416,9 @@ class _CheckpointInfoPanel extends StatelessWidget {
   void _soon(BuildContext context) {
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('قريباً')));
+    ).showSnackBar(
+      const SnackBar(content: Text('هذه الخدمة ستتوفر قريبا')),
+    );
   }
 
   @override
@@ -1495,41 +1466,10 @@ class _CheckpointInfoPanel extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   Expanded(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      textDirection: TextDirection.rtl,
-                      children: <Widget>[
-                        Expanded(
-                          child: _InfoActionTile(
-                            label: 'الطرق البديلة',
-                            icon: Icons.alt_route_rounded,
-                            onTap: () => _soon(context),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _InfoActionTile(
-                            label: 'المثبتة',
-                            icon: Icons.bookmark_rounded,
-                            onTap: () async {
-                              if (!canUserMakeCheckpointWrites) {
-                                await showSavedLoginRequiredDialog(context);
-                                return;
-                              }
-                              if (!context.mounted) {
-                                return;
-                              }
-                              await Navigator.of(context).push<void>(
-                                MaterialPageRoute<void>(
-                                  builder: (_) =>
-                                      const SavedCheckpointsScreen(),
-                                ),
-                              );
-                            },
-                            solidBlueIconCircle: true,
-                          ),
-                        ),
-                      ],
+                    child: _InfoActionTile(
+                      label: 'الطرق البديلة',
+                      icon: Icons.alt_route_rounded,
+                      onTap: () => _soon(context),
                     ),
                   ),
                 ],
