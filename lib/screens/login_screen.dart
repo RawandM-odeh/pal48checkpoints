@@ -186,6 +186,7 @@ class _LoginScreenState extends State<LoginScreen> {
               errorText: _errorText,
               maxWidth: wide ? 420 : _cardMaxWidth(constraints.maxWidth),
               horizontalPadding: _horizontalPadding(constraints.maxWidth),
+              embedInParentScrollView: !wide,
             );
 
             if (wide) {
@@ -312,6 +313,7 @@ class _LoginFormColumn extends StatelessWidget {
     required this.errorText,
     required this.maxWidth,
     required this.horizontalPadding,
+    this.embedInParentScrollView = false,
   });
 
   final TextTheme textTheme;
@@ -331,64 +333,93 @@ class _LoginFormColumn extends StatelessWidget {
   final double maxWidth;
   final double horizontalPadding;
 
+  /// When true, a parent [SingleChildScrollView] already scrolls — avoid nested
+  /// scroll + [minHeight] from unbounded constraints (infinite height on web).
+  final bool embedInParentScrollView;
+
+  Widget _formBody({
+    required MainAxisAlignment mainAxisAlignment,
+    double minHeight = 0,
+  }) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: maxWidth,
+        minHeight: minHeight,
+      ),
+      child: Column(
+        mainAxisAlignment: mainAxisAlignment,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          _BrandHeader(textTheme: textTheme),
+          const SizedBox(height: 28),
+          _LoginCard(
+            formKey: formKey,
+            theme: theme,
+            emailController: emailController,
+            passwordController: passwordController,
+            obscurePassword: obscurePassword,
+            onObscurePasswordChanged: onObscurePasswordChanged,
+            isLoading: isLoading,
+            inputsEnabled: inputsEnabled,
+            onEmailLogin: onEmailLogin,
+            onEmailRegister: onEmailRegister,
+            onGoogleSignIn: onGoogleSignIn,
+            onSkipForLater: onSkipForLater,
+            errorText: errorText,
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'تسجيل الدخول عبر البريد أو Google أو Firebase',
+            textAlign: TextAlign.center,
+            style: textTheme.bodySmall?.copyWith(
+              color: AppColors.textMutedLight,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final EdgeInsets padding = EdgeInsets.fromLTRB(
+      horizontalPadding,
+      20,
+      horizontalPadding,
+      28,
+    );
+
+    if (embedInParentScrollView) {
+      return ColoredBox(
+        color: Colors.white,
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: padding,
+            child: Center(child: _formBody(mainAxisAlignment: MainAxisAlignment.start)),
+          ),
+        ),
+      );
+    }
+
     return ColoredBox(
       color: Colors.white,
       child: SafeArea(
         child: LayoutBuilder(
           builder: (BuildContext context, BoxConstraints constraints) {
+            final double minHeight = constraints.maxHeight.isFinite
+                ? constraints.maxHeight -
+                    MediaQuery.paddingOf(context).vertical -
+                    48
+                : 0;
             return SingleChildScrollView(
               physics: const BouncingScrollPhysics(),
-              padding: EdgeInsets.fromLTRB(
-                horizontalPadding,
-                20,
-                horizontalPadding,
-                28,
-              ),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight:
-                      constraints.maxHeight -
-                      MediaQuery.paddingOf(context).vertical -
-                      48,
-                ),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: maxWidth),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: <Widget>[
-                        _BrandHeader(textTheme: textTheme),
-                        const SizedBox(height: 28),
-                        _LoginCard(
-                          formKey: formKey,
-                          theme: theme,
-                          emailController: emailController,
-                          passwordController: passwordController,
-                          obscurePassword: obscurePassword,
-                          onObscurePasswordChanged: onObscurePasswordChanged,
-                          isLoading: isLoading,
-                          inputsEnabled: inputsEnabled,
-                          onEmailLogin: onEmailLogin,
-                          onEmailRegister: onEmailRegister,
-                          onGoogleSignIn: onGoogleSignIn,
-                          onSkipForLater: onSkipForLater,
-                          errorText: errorText,
-                        ),
-                        const SizedBox(height: 20),
-                        Text(
-                          'تسجيل الدخول عبر البريد أو Google أو Firebase',
-                          textAlign: TextAlign.center,
-                          style: textTheme.bodySmall?.copyWith(
-                            color: AppColors.textMutedLight,
-                            height: 1.4,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+              padding: padding,
+              child: Center(
+                child: _formBody(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  minHeight: minHeight,
                 ),
               ),
             );
