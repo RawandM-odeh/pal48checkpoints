@@ -18,7 +18,10 @@ List<String> _distinctCheckpointCities(List<Checkpoint> items) {
     }
   }
   final List<String> list = set.toList(growable: false);
-  list.sort((String a, String b) => a.toLowerCase().compareTo(b.toLowerCase()));
+  list.sort(
+    (String a, String b) =>
+        cityDisplayNameAr(a).compareTo(cityDisplayNameAr(b)),
+  );
   return list;
 }
 
@@ -195,7 +198,7 @@ class _CheckpointsTabState extends State<CheckpointsTab> {
               child: Text(
                 'لا توجد حواجز',
                 style: theme.textTheme.titleMedium?.copyWith(
-                  color: Colors.white54,
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
             );
@@ -225,7 +228,7 @@ class _CheckpointsTabState extends State<CheckpointsTab> {
                             Icon(
                               Icons.location_city_outlined,
                               size: 22,
-                              color: Colors.white.withValues(alpha: 0.85),
+                              color: theme.colorScheme.onSurfaceVariant,
                             ),
                             const SizedBox(width: 8),
                             Expanded(
@@ -244,7 +247,7 @@ class _CheckpointsTabState extends State<CheckpointsTab> {
                                           DropdownMenuItem<String?>(
                                         value: city,
                                         child: Text(
-                                          city,
+                                          cityDisplayNameAr(city),
                                           textAlign: TextAlign.right,
                                         ),
                                       ),
@@ -265,23 +268,13 @@ class _CheckpointsTabState extends State<CheckpointsTab> {
                         controller: _searchCtrl,
                         textAlign: TextAlign.right,
                         textDirection: TextDirection.rtl,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.95),
-                        ),
                         decoration: InputDecoration(
                           labelText: 'بحث',
                           hintText: 'اسم الحاجز، المعرّف، المدينة…',
-                          hintStyle: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.35),
-                          ),
-                          labelStyle: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.75),
-                          ),
-                          floatingLabelBehavior: FloatingLabelBehavior.auto,
                           isDense: true,
                           prefixIcon: Icon(
                             Icons.search_rounded,
-                            color: Colors.white.withValues(alpha: 0.65),
+                            color: theme.colorScheme.onSurfaceVariant,
                             size: 22,
                           ),
                           suffixIcon: _searchCtrl.text.isEmpty
@@ -290,9 +283,7 @@ class _CheckpointsTabState extends State<CheckpointsTab> {
                                   tooltip: 'مسح',
                                   icon: Icon(
                                     Icons.clear_rounded,
-                                    color: Colors.white.withValues(
-                                      alpha: 0.55,
-                                    ),
+                                    color: theme.colorScheme.onSurfaceVariant,
                                     size: 20,
                                   ),
                                   onPressed: () {
@@ -300,20 +291,6 @@ class _CheckpointsTabState extends State<CheckpointsTab> {
                                     setState(() {});
                                   },
                                 ),
-                          border: const OutlineInputBorder(),
-                          enabledBorder: OutlineInputBorder(
-                            borderSide: BorderSide(
-                              color: Colors.white.withValues(alpha: 0.28),
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderSide: BorderSide(
-                              color: theme.colorScheme.primary,
-                              width: 1.5,
-                            ),
-                          ),
-                          filled: true,
-                          fillColor: Colors.white.withValues(alpha: 0.06),
                           contentPadding: const EdgeInsets.symmetric(
                             horizontal: 8,
                             vertical: 10,
@@ -331,7 +308,7 @@ class _CheckpointsTabState extends State<CheckpointsTab> {
                         child: Text(
                           _emptyFilteredMessage(),
                           style: theme.textTheme.titleMedium?.copyWith(
-                            color: Colors.white54,
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
                           textAlign: TextAlign.center,
                         ),
@@ -351,8 +328,7 @@ class _CheckpointsTabState extends State<CheckpointsTab> {
                           final Checkpoint c = filtered[index];
                           return CheckpointCard(
                             checkpoint: c,
-                            appearance:
-                                CheckpointCardAppearance.darkUserLike,
+                            appearance: CheckpointCardAppearance.light,
                             onStatusBadgeTap: (String direction) =>
                                 _onBadgeTap(context, c, direction),
                             onCardTap: () => _openDetail(context, c),
@@ -737,14 +713,6 @@ class _AddCheckpointDialogState extends State<_AddCheckpointDialog> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'priority = 1، type = main_checkpoint تلقائياً.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    textAlign: TextAlign.right,
-                  ),
                 ],
               ),
             ),
@@ -1080,7 +1048,7 @@ class _EditCheckpointDialogState extends State<_EditCheckpointDialog> {
                                               DropdownMenuItem<String>(
                                             value: city,
                                             child: Text(
-                                              city,
+                                              cityDisplayNameAr(city),
                                               textAlign: TextAlign.right,
                                               overflow: TextOverflow.ellipsis,
                                             ),

@@ -39,7 +39,7 @@ class _SendNotificationTabState extends State<SendNotificationTab> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'تم حفظ الإشعار — سيظهر للمستخدمين في تبويب الإشعارات داخل التطبيق',
+            'تم إرسال الإشعار — سيظهر للمستخدمين في تبويب الإشعارات داخل التطبيق',
           ),
         ),
       );
@@ -50,7 +50,7 @@ class _SendNotificationTabState extends State<SendNotificationTab> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('فشل الحفظ: $e')),
+        SnackBar(content: Text('فشل الإرسال: $e')),
       );
     } finally {
       if (mounted) {
@@ -71,13 +71,13 @@ class _SendNotificationTabState extends State<SendNotificationTab> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               Text(
-                'حفظ إشعار للمستخدمين',
+                'إرسال إشعار للمستخدمين',
                 style: theme.textTheme.titleLarge,
                 textAlign: TextAlign.right,
               ),
               const SizedBox(height: 8),
               Text(
-                'يُحفظ في السحابة ويُعرَض داخل التطبيق فقط (بدون إشعار نظام للهاتف).',
+                'يُرسل إلى السحابة ويُعرَض داخل التطبيق فقط (بدون إشعار نظام للهاتف).',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurface.withValues(alpha: 0.65),
                 ),
@@ -125,8 +125,8 @@ class _SendNotificationTabState extends State<SendNotificationTab> {
                           color: Theme.of(context).colorScheme.onPrimary,
                         ),
                       )
-                    : const Icon(Icons.save_alt_rounded),
-                label: Text(_saving ? 'جاري الحفظ...' : 'حفظ الإشعار'),
+                    : const Icon(Icons.send_rounded),
+                label: Text(_saving ? 'جاري الإرسال...' : 'إرسال الإشعار'),
               ),
             ],
           ),
