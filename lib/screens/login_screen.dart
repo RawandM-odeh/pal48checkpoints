@@ -164,6 +164,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
+        backgroundColor: Colors.white,
         body: LayoutBuilder(
           builder: (BuildContext context, BoxConstraints constraints) {
             final bool wide = constraints.maxWidth >= _splitLayoutBreakpoint;
@@ -206,20 +207,8 @@ class _LoginScreenState extends State<LoginScreen> {
               );
             }
 
-            return Container(
-              width: double.infinity,
-              height: double.infinity,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: <Color>[
-                    Color(0xFFF8FAFC),
-                    Color(0xFFEEF2FF),
-                    Color(0xFFECFEFF),
-                  ],
-                ),
-              ),
+            return ColoredBox(
+              color: Colors.white,
               child: SafeArea(
                 child: SingleChildScrollView(
                   physics: const BouncingScrollPhysics(),
@@ -227,7 +216,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
                       SizedBox(
-                        height: 240,
+                        height: 190,
                         child: _LoginIllustrationPanel(compact: true),
                       ),
                       loginColumn,
@@ -264,43 +253,37 @@ class _LoginIllustrationPanel extends StatelessWidget {
 
   final bool compact;
 
-  static const Color _panelBg = Color(0xFFF8FAFC);
+  static const String _handalaAsset = 'assets/images/handala_key.png';
+  static const String _handalaFallback = 'images/login_handala.png';
 
   @override
   Widget build(BuildContext context) {
     return ColoredBox(
-      color: _panelBg,
+      color: Colors.white,
       child: LayoutBuilder(
         builder: (BuildContext context, BoxConstraints constraints) {
           if (constraints.maxHeight <= 0 || constraints.maxWidth <= 0) {
             return const SizedBox.shrink();
           }
 
-          if (!compact) {
-            // Fill the whole left pane; focal point left so Handala stays off the login card.
-            return ClipRect(
-              child: SizedBox.expand(
-                child: Image.asset(
-                  'images/login_handala.png',
-                  fit: BoxFit.cover,
-                  alignment: const Alignment(-0.72, 0.08),
-                  filterQuality: FilterQuality.medium,
-                ),
-              ),
-            );
-          }
+          final double imageHeight = compact
+              ? constraints.maxHeight * 0.88
+              : constraints.maxHeight * 0.72;
 
-          return ClipRect(
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Padding(
-                padding: const EdgeInsetsDirectional.only(start: 12),
-                child: Image.asset(
-                  'images/login_handala.png',
-                  height: constraints.maxHeight,
-                  fit: BoxFit.fitHeight,
-                  alignment: Alignment.centerLeft,
-                  filterQuality: FilterQuality.medium,
+          return Center(
+            child: Padding(
+              padding: EdgeInsets.all(compact ? 16 : 40),
+              child: Image.asset(
+                _handalaAsset,
+                height: imageHeight,
+                fit: BoxFit.contain,
+                alignment: Alignment.center,
+                filterQuality: FilterQuality.medium,
+                errorBuilder: (BuildContext context, Object error, StackTrace? stack) =>
+                    Image.asset(
+                  _handalaFallback,
+                  height: imageHeight,
+                  fit: BoxFit.contain,
                 ),
               ),
             ),
@@ -350,19 +333,8 @@ class _LoginFormColumn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: <Color>[
-            Color(0xFFF8FAFC),
-            Color(0xFFEEF2FF),
-            Color(0xFFECFEFF),
-          ],
-        ),
-      ),
+    return ColoredBox(
+      color: Colors.white,
       child: SafeArea(
         child: LayoutBuilder(
           builder: (BuildContext context, BoxConstraints constraints) {
