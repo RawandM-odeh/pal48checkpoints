@@ -154,6 +154,8 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  static const double _splitLayoutBreakpoint = 720;
+
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
@@ -162,85 +164,68 @@ class _LoginScreenState extends State<LoginScreen> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        body: Container(
-          width: double.infinity,
-          height: double.infinity,
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: <Color>[
-                Color(0xFFF8FAFC),
-                Color(0xFFEEF2FF),
-                Color(0xFFECFEFF),
-              ],
-            ),
-          ),
-          child: LayoutBuilder(
-            builder: (BuildContext context, BoxConstraints constraints) {
-              return SafeArea(
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: EdgeInsets.fromLTRB(
-                    _horizontalPadding(constraints.maxWidth),
-                    20,
-                    _horizontalPadding(constraints.maxWidth),
-                    28,
-                  ),
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight:
-                          constraints.maxHeight -
-                          MediaQuery.paddingOf(context).vertical -
-                          48,
+        backgroundColor: Colors.white,
+        body: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            final bool wide = constraints.maxWidth >= _splitLayoutBreakpoint;
+            final Widget loginColumn = _LoginFormColumn(
+              textTheme: textTheme,
+              theme: theme,
+              formKey: _formKey,
+              emailController: _emailController,
+              passwordController: _passwordController,
+              obscurePassword: _obscurePassword,
+              onObscurePasswordChanged: (bool obscure) =>
+                  setState(() => _obscurePassword = obscure),
+              isLoading: _isLoading,
+              inputsEnabled: !_isLoading,
+              onEmailLogin: () => unawaited(_onEmailPasswordLogin()),
+              onEmailRegister: () => unawaited(_onEmailPasswordRegister()),
+              onGoogleSignIn: _onGoogleSignIn,
+              onSkipForLater: _onSkipForLater,
+              errorText: _errorText,
+              maxWidth: wide ? 420 : _cardMaxWidth(constraints.maxWidth),
+              horizontalPadding: _horizontalPadding(constraints.maxWidth),
+            );
+
+            if (wide) {
+              return Directionality(
+                textDirection: TextDirection.ltr,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    const Expanded(
+                      flex: 5,
+                      child: _LoginIllustrationPanel(),
                     ),
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: _cardMaxWidth(constraints.maxWidth),
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: <Widget>[
-                            _BrandHeader(textTheme: textTheme),
-                            const SizedBox(height: 28),
-                            _LoginCard(
-                              formKey: _formKey,
-                              theme: theme,
-                              emailController: _emailController,
-                              passwordController: _passwordController,
-                              obscurePassword: _obscurePassword,
-                              onObscurePasswordChanged: (bool obscure) =>
-                                  setState(() => _obscurePassword = obscure),
-                              isLoading: _isLoading,
-                              inputsEnabled: !_isLoading,
-                              onEmailLogin: () =>
-                                  unawaited(_onEmailPasswordLogin()),
-                              onEmailRegister: () =>
-                                  unawaited(_onEmailPasswordRegister()),
-                              onGoogleSignIn: _onGoogleSignIn,
-                              onSkipForLater: _onSkipForLater,
-                              errorText: _errorText,
-                            ),
-                            const SizedBox(height: 20),
-                            Text(
-                              'تسجيل الدخول عبر البريد أو Google أو Firebase',
-                              textAlign: TextAlign.center,
-                              style: textTheme.bodySmall?.copyWith(
-                                color: AppColors.textMutedLight,
-                                height: 1.4,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                    Expanded(
+                      flex: 4,
+                      child: loginColumn,
                     ),
-                  ),
+                  ],
                 ),
               );
-            },
-          ),
+            }
+
+            return ColoredBox(
+              color: Colors.white,
+              child: SafeArea(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      SizedBox(
+                        height: 190,
+                        child: _LoginIllustrationPanel(compact: true),
+                      ),
+                      loginColumn,
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -262,6 +247,158 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
+/// Left panel: Handala at full viewport height, anchored left so the login card stays clear.
+class _LoginIllustrationPanel extends StatelessWidget {
+  const _LoginIllustrationPanel({this.compact = false});
+
+  final bool compact;
+
+  static const String _handalaAsset = 'assets/images/handala_key.png';
+  static const String _handalaFallback = 'images/login_handala.png';
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Colors.white,
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          if (constraints.maxHeight <= 0 || constraints.maxWidth <= 0) {
+            return const SizedBox.shrink();
+          }
+
+          final double imageHeight = compact
+              ? constraints.maxHeight * 0.88
+              : constraints.maxHeight * 0.72;
+
+          return Center(
+            child: Padding(
+              padding: EdgeInsets.all(compact ? 16 : 40),
+              child: Image.asset(
+                _handalaAsset,
+                height: imageHeight,
+                fit: BoxFit.contain,
+                alignment: Alignment.center,
+                filterQuality: FilterQuality.medium,
+                errorBuilder: (BuildContext context, Object error, StackTrace? stack) =>
+                    Image.asset(
+                  _handalaFallback,
+                  height: imageHeight,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _LoginFormColumn extends StatelessWidget {
+  const _LoginFormColumn({
+    required this.textTheme,
+    required this.theme,
+    required this.formKey,
+    required this.emailController,
+    required this.passwordController,
+    required this.obscurePassword,
+    required this.onObscurePasswordChanged,
+    required this.isLoading,
+    required this.inputsEnabled,
+    required this.onEmailLogin,
+    required this.onEmailRegister,
+    required this.onGoogleSignIn,
+    required this.onSkipForLater,
+    required this.errorText,
+    required this.maxWidth,
+    required this.horizontalPadding,
+  });
+
+  final TextTheme textTheme;
+  final ThemeData theme;
+  final GlobalKey<FormState> formKey;
+  final TextEditingController emailController;
+  final TextEditingController passwordController;
+  final bool obscurePassword;
+  final ValueChanged<bool> onObscurePasswordChanged;
+  final bool isLoading;
+  final bool inputsEnabled;
+  final VoidCallback onEmailLogin;
+  final VoidCallback onEmailRegister;
+  final VoidCallback onGoogleSignIn;
+  final VoidCallback onSkipForLater;
+  final String? errorText;
+  final double maxWidth;
+  final double horizontalPadding;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Colors.white,
+      child: SafeArea(
+        child: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            return SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              padding: EdgeInsets.fromLTRB(
+                horizontalPadding,
+                20,
+                horizontalPadding,
+                28,
+              ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight:
+                      constraints.maxHeight -
+                      MediaQuery.paddingOf(context).vertical -
+                      48,
+                ),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: maxWidth),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        _BrandHeader(textTheme: textTheme),
+                        const SizedBox(height: 28),
+                        _LoginCard(
+                          formKey: formKey,
+                          theme: theme,
+                          emailController: emailController,
+                          passwordController: passwordController,
+                          obscurePassword: obscurePassword,
+                          onObscurePasswordChanged: onObscurePasswordChanged,
+                          isLoading: isLoading,
+                          inputsEnabled: inputsEnabled,
+                          onEmailLogin: onEmailLogin,
+                          onEmailRegister: onEmailRegister,
+                          onGoogleSignIn: onGoogleSignIn,
+                          onSkipForLater: onSkipForLater,
+                          errorText: errorText,
+                        ),
+                        const SizedBox(height: 20),
+                        Text(
+                          'تسجيل الدخول عبر البريد أو Google أو Firebase',
+                          textAlign: TextAlign.center,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: AppColors.textMutedLight,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
 class _BrandHeader extends StatelessWidget {
   const _BrandHeader({required this.textTheme});
 
@@ -271,50 +408,12 @@ class _BrandHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: <Widget>[
-        Container(
-          width: 96,
-          height: 96,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: <Color>[
-                AppColors.brandTeal,
-                AppColors.brandTealDark,
-                AppColors.brandMint.withValues(alpha: 0.9),
-              ],
-            ),
-            boxShadow: <BoxShadow>[
-              BoxShadow(
-                color: AppColors.brandTeal.withValues(alpha: 0.35),
-                blurRadius: 28,
-                offset: const Offset(0, 14),
-              ),
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: const Icon(
-            Icons.shield_outlined,
-            size: 44,
-            color: Colors.white,
-          ),
+        Image.asset(
+          'images/app_logo.png',
+          height: 80,
+          fit: BoxFit.contain,
         ),
-        const SizedBox(height: 22),
-        Text(
-          'Pal48Checkpoints',
-          textAlign: TextAlign.center,
-          style: textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.5,
-            color: const Color(0xFF0F172A),
-          ),
-        ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 20),
         Text(
           'مرحبًا بك — نقاط التفتيش في متناول يدك',
           textAlign: TextAlign.center,
