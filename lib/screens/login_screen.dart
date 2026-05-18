@@ -271,50 +271,12 @@ class _BrandHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: <Widget>[
-        Container(
-          width: 96,
-          height: 96,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: <Color>[
-                AppColors.brandTeal,
-                AppColors.brandTealDark,
-                AppColors.brandMint.withValues(alpha: 0.9),
-              ],
-            ),
-            boxShadow: <BoxShadow>[
-              BoxShadow(
-                color: AppColors.brandTeal.withValues(alpha: 0.35),
-                blurRadius: 28,
-                offset: const Offset(0, 14),
-              ),
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: const Icon(
-            Icons.shield_outlined,
-            size: 44,
-            color: Colors.white,
-          ),
+        Image.asset(
+          'images/app_logo.png',
+          height: 80,
+          fit: BoxFit.contain,
         ),
-        const SizedBox(height: 22),
-        Text(
-          'Pal48Checkpoints',
-          textAlign: TextAlign.center,
-          style: textTheme.headlineSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.5,
-            color: const Color(0xFF0F172A),
-          ),
-        ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 20),
         Text(
           'مرحبًا بك — نقاط التفتيش في متناول يدك',
           textAlign: TextAlign.center,
