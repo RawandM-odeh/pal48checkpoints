@@ -32,5 +32,6 @@ const Map<String, String> _enCityToAr = <String, String>{
   'qalqilya': 'قلقيلية',
   'qalqiliya': 'قلقيلية',
   'ramallah': 'رام الله',
+  'salfit': 'سلفيت',
   'tulkarm': 'طولكرم',
 };
