@@ -18,7 +18,10 @@ List<String> _distinctCheckpointCities(List<Checkpoint> items) {
     }
   }
   final List<String> list = set.toList(growable: false);
-  list.sort((String a, String b) => a.toLowerCase().compareTo(b.toLowerCase()));
+  list.sort(
+    (String a, String b) =>
+        cityDisplayNameAr(a).compareTo(cityDisplayNameAr(b)),
+  );
   return list;
 }
 
@@ -244,7 +247,7 @@ class _CheckpointsTabState extends State<CheckpointsTab> {
                                           DropdownMenuItem<String?>(
                                         value: city,
                                         child: Text(
-                                          city,
+                                          cityDisplayNameAr(city),
                                           textAlign: TextAlign.right,
                                         ),
                                       ),
@@ -1080,7 +1083,7 @@ class _EditCheckpointDialogState extends State<_EditCheckpointDialog> {
                                               DropdownMenuItem<String>(
                                             value: city,
                                             child: Text(
-                                              city,
+                                              cityDisplayNameAr(city),
                                               textAlign: TextAlign.right,
                                               overflow: TextOverflow.ellipsis,
                                             ),
